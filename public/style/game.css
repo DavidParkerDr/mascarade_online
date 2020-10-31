@@ -1,0 +1,11 @@
+body {
+	overflow: hidden;
+}
+
+canvas {
+	display: block;
+}
+
+span.localPlayer {
+	font-weight: bold;
+}
