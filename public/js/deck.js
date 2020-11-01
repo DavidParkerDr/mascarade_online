@@ -10,6 +10,9 @@ class Deck {
     addCard(pCard) {
         this.mCards.push(pCard);
     }
+    numberOfCards() {
+        return this.mCards.length;
+    }
 
     drawCard(pIndex) {
         let card = this.mCards[pIndex];
