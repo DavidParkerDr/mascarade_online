@@ -6,7 +6,14 @@
         this.setIsLocal(pIsLocal);
         this.setIsPlaceHolder(pIsPlaceHolder);
         this.setCoins(6);
-        this.setCard(null);
+        this.setCard(null);        
+        this.setIsReady(false);
+    }
+    setIsReady(pIsReady) {
+        this.mIsReady = pIsReady;
+    }
+    getIsReady() {
+        return this.mIsReady;
     }
     setIsPlaceHolder(pIsPlaceHolder) {
         this.mIsPlaceHolder = pIsPlaceHolder;
