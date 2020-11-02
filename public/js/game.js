@@ -143,7 +143,9 @@
                 playersList += '<span class="remotePlayer">';
             }
             playersList += player.getId() + " : " + player.getName() + " ";
-            playersList += " : " + player.getCoins() + " ";
+            if(!player.getIsPlaceHolder()) {
+                playersList += " : " + player.getCoins() + " ";
+            }
             if(player.getCard() != null) {
                 if(player.getCard().isHidden()) {
                     playersList += " - " + "Card is Face Down" + " ";
@@ -199,7 +201,9 @@
                 playersList += '<span class="remotePlayer">';
             }
             playersList += player.getId() + " : " + player.getName() + " ";
-            playersList += " : " + player.getCoins() + " ";
+            if(!player.getIsPlaceHolder()) {
+                playersList += " : " + player.getCoins() + " ";
+            }
             
             playersList += '</span>';
             if(player.getIsReady()) {            
@@ -223,12 +227,12 @@
                     
                 }
 
-            }
-            
+            }        
 
             playersList += "<br/>";
-
         }
+        playersList += "<br/>";
+        playersList += '<span class="remotePlayer">The Courthouse has ' + this.getCourthouseCoins() + ' coins.';
         playersArea.innerHTML = playersList;
         let readyButton = document.getElementById("readyButton");
         if(readyButton != null) {
@@ -248,7 +252,9 @@
                 playersList += '<span class="remotePlayer">';
             }
             playersList += player.getId() + " : " + player.getName() + " ";
-            playersList += " : " + player.getCoins() + " ";
+            if(!player.getIsPlaceHolder()) {
+                playersList += " : " + player.getCoins() + " ";
+            }
             if(player.getCard() != null) {
                 if(player.getCard().isHidden()) {
                     playersList += " - " + "Card is Face Down" + " ";
@@ -283,8 +289,9 @@
             
 
             playersList += "<br/>";
-
         }
+        playersList += "<br/>";
+            playersList += '<span class="remotePlayer">The Courthouse has ' + this.getCourthouseCoins() + ' coins.';
         playersArea.innerHTML = playersList;
         let readyButton = document.getElementById("readyButton");
         if(readyButton != null) {
@@ -304,11 +311,14 @@
                 playersList += '<span class="remotePlayer">';
             }
             playersList += player.getId() + " : " + player.getName() + " ";
-            playersList += " : " + player.getCoins() + " ";
+            if(!player.getIsPlaceHolder()) {
+                playersList += " : " + player.getCoins() + " ";
+            }
             playersList += '</span>';
             playersList += "<br/>";
-
         }
+        playersList += "<br/>";
+        playersList += '<span class="remotePlayer">The Courthouse has ' + this.getCourthouseCoins() + ' coins.';
         playersArea.innerHTML = playersList;
         
     }
@@ -584,11 +594,17 @@
 
         turnInformationArea.innerHTML = turnInformationContent;
     }
-
+    setCourthouseCoins(pCourthouseCoins) {
+        this.mCourthouseCoins = pCourthouseCoins;
+    }
+    getCourthouseCoins() {
+        return this.mCourthouseCoins;
+    }
     onUpdatePlayers(data) {
         console.log("received player update from server");
         this.mPlayers = [];
         let dataPlayers = data.players;
+        this.setCourthouseCoins(data.courthouseCoins);
         for(let i = 0; i < dataPlayers.length; i +=1) {
             let playerObject = dataPlayers[i];
             let player = new Player(playerObject.id, playerObject.colour, playerObject.name, playerObject.isLocal, playerObject.isPlaceHolder);
@@ -630,7 +646,7 @@
         }
         for(let i = 0; i < falseClaims.length; i +=1) {
             let falseClaim = falseClaims[i];
-            turnInformationContent += '<h4>' + falseClaim + '</h4><br/>';
+            turnInformationContent += '<h4>' + falseClaim.player + ' is actually the ' + falseClaim.card + '</h4><br/>';
         }
         turnInformationArea.innerHTML = turnInformationContent;
     }

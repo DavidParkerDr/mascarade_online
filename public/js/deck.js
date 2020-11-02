@@ -71,8 +71,8 @@ class Deck {
         deck.addCard(bishop);
         let king = new Card("King");
         deck.addCard(king);
-        let fool = new Card("Fool");
-        deck.addCard(fool);
+        //let fool = new Card("Fool");
+        //deck.addCard(fool);
         let queen = new Card("Queen");
         deck.addCard(queen);
         let thief = new Card("Thief");

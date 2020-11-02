@@ -12,6 +12,23 @@ class ServerGame {
         this.setCourthouseCoins(0);        
         this.resetClaims();
     }
+    setMandatorySwaps(pMandatorySwaps) {
+        this.mMandatorySwaps = pMandatorySwaps;
+    }
+    getMandatorySwaps() {
+        return this.mMandatorySwaps;
+    }
+    decrementMandatorySwaps() {
+        let mandatorySwaps = this.getMandatorySwaps() - 1;
+        if (mandatorySwaps < 0) {
+            mandatorySwaps = 0;
+        }
+        this.setMandatorySwaps(mandatorySwaps);
+    }
+    pickRandomPlayerIndex() {
+        var index = Math.floor((Math.random() * this.numberOfNonPlaceHolderPlayers()) + 0);
+        return index;
+    }
     setClaimResolution(pClaimResolution) {
         this.mClaimResolution = pClaimResolution;
     }
@@ -80,11 +97,19 @@ class ServerGame {
     getCurrentPlayerIndex() {
         return this.mCurrentPlayerIndex;
     }
-    incrementCurrentPlayerIndex() {
-        this.mCurrentPlayerIndex += 1;
-        if(this.mCurrentPlayerIndex >= this.numberOfPlayers()) {
-            this.mCurrentPlayerIndex = 0;
+    getNextPlayerIndex() {
+        let index = this.mCurrentPlayerIndex;
+        do {
+            index += 1;
+            if(index >= this.numberOfPlayers()) {
+                index = 0;
+            }
         }
+        while(this.getPlayer(index).getIsPlaceHolder())
+        return index;
+    }
+    incrementCurrentPlayerIndex() {
+        this.mCurrentPlayerIndex =this.getNextPlayerIndex();
     }
     setClaimPlayerIndex(pClaimPlayerIndex) {
         this.mClaimPlayerIndex = pClaimPlayerIndex;
@@ -124,6 +149,16 @@ class ServerGame {
     }
     numberOfPlayers() {
         return this.mPlayers.length;
+    };
+    numberOfNonPlaceHolderPlayers() {
+        let count = 0;
+        for(let i = 0; i < this.numberOfPlayers(); i+=1) {
+            let player = this.getPlayer(i);
+            if(!player.getIsPlaceHolder()){
+                count +=1;
+            }
+        }
+        return count;
     };
     getPlayer(pIndex) {
         if(pIndex < this.numberOfPlayers()) {
@@ -234,18 +269,23 @@ class ServerGame {
     sendTurnOptions(pTurn) {
         let dataObject = {};
         dataObject.turnOptions = [];
-        let lookTurnOption = {};
-        lookTurnOption.id = "lookAtCard";
-        lookTurnOption.text = "Look At Card";
-        dataObject.turnOptions.push(lookTurnOption);
+        if(this.getMandatorySwaps() == 0) {
+            let lookTurnOption = {};
+            lookTurnOption.id = "lookAtCard";
+            lookTurnOption.text = "Look At Card";
+            dataObject.turnOptions.push(lookTurnOption);
+        }
         let swapTurnOption = {};
         swapTurnOption.id = "swapOrNot";
         swapTurnOption.text = "Swap Or Not";
         dataObject.turnOptions.push(swapTurnOption);
-        let claimTurnOption = {};
-        claimTurnOption.id = "makeAClaim";
-        claimTurnOption.text = "Make a Claim";
-        dataObject.turnOptions.push(claimTurnOption);        
+        if(this.getMandatorySwaps() == 0) {
+            let claimTurnOption = {};
+            claimTurnOption.id = "makeAClaim";
+            claimTurnOption.text = "Make a Claim";
+            dataObject.turnOptions.push(claimTurnOption);   
+        }
+        this.decrementMandatorySwaps();     
         pTurn.getPlayer().getClient().emit("your turn", dataObject);
         let otherDataObject = {};
         otherDataObject.playerName = pTurn.getPlayer().getName();
@@ -369,6 +409,21 @@ class ServerGame {
             }
         }
     }
+    checkMandatorySwaps() {
+        let mandatorySwapsNeeded = false;
+        for(let i = 0; i < this.numberofRightfulClaimants(); i+=1) {
+            let rightfulClaimant = this.getRightfulClaimant(i);
+            let rightfulClaimantIndex = this.getPlayerIndex(rightfulClaimant.getId());
+            let nextPlayerIndex = this.getNextPlayerIndex();
+            if(rightfulClaimantIndex == nextPlayerIndex) {
+                mandatorySwapsNeeded = true;
+                break;
+            }
+        }
+        if(mandatorySwapsNeeded) {
+            this.setMandatorySwaps(1);
+        }
+    }
     enactClaim() {
         let claim = this.getClaim();
         if(claim == "Judge") {
@@ -387,7 +442,7 @@ class ServerGame {
             let richestPlayers = [];
             for(let i = 0; i < this.numberOfPlayers(); i+= 1) {
                 let player = this.getPlayer(i);
-                if(player.getId() != rightfulClaimant.getId()) {
+                if(player.getId() != rightfulClaimant.getId() && !player.getIsPlaceHolder()) {
                     if(player.getCoins() > biggestFortune) {                    
                         biggestFortune = player.getCoins();
                         richestPlayers = [];
@@ -448,6 +503,13 @@ class ServerGame {
                 leftVictimIndex = this.numberOfPlayers() -1;
             }
             let leftVictim = this.getPlayer(leftVictimIndex);
+            while(leftVictim.getIsPlaceHolder()) {
+                leftVictimIndex = leftVictimIndex - 1;
+                if(leftVictimIndex < 0) {
+                    leftVictimIndex = this.numberOfPlayers() -1;
+                }
+                leftVictim = this.getPlayer(leftVictimIndex);
+            }
             let tempCoins1 = leftVictim.getCoins();
             leftVictim.removeCoins(1);
             if(tempCoins1 > 1) {
@@ -459,6 +521,13 @@ class ServerGame {
                 rightVictimIndex = 0;
             }
             let rightVictim = this.getPlayer(rightVictimIndex);
+            while(rightVictim.getIsPlaceHolder()){
+                rightVictimIndex = rightVictimIndex + 1;
+                if(rightVictimIndex >= this.numberOfPlayers()) {
+                    rightVictimIndex = 0;
+                }
+                rightVictim = this.getPlayer(rightVictimIndex);
+            }
             let tempCoins2 = rightVictim.getCoins();
             rightVictim.removeCoins(1);
             if(tempCoins2 > 1) {
@@ -539,6 +608,7 @@ class ServerGame {
     finaliseClaims() {
         console.log("finaliseClaims " + this.getClaimResolution());
         this.fineFalseClaims();
+        this.checkMandatorySwaps();
         this.setAllPlayersNotReady();
         this.setShouldShowResolution(true);
         this.updateClientPlayers();
@@ -547,8 +617,11 @@ class ServerGame {
         dataObject.claim = this.getClaim();      
         dataObject.falseClaims = [];
         for(let i = 0; i < this.numberOfFalselyClaimingPlayers(); i +=1) {
-            let falselyClaimingPlayer = this.getFalselyClaimingPlayer(i);            
-            dataObject.falseClaims.push(falselyClaimingPlayer.getName());
+            let claimObject = {};
+            let falselyClaimingPlayer = this.getFalselyClaimingPlayer(i);  
+            claimObject.player = falselyClaimingPlayer.getName();
+            claimObject.card = falselyClaimingPlayer.getCard().getName();
+            dataObject.falseClaims.push(claimObject);
         }
         let total = this.numberOfPlayers();
         for(let i = 0; i < total; i +=1) {
@@ -581,8 +654,8 @@ class ServerGame {
         for(let i = 0; i < this.numberOfFalselyClaimingPlayers(); i +=1) {
             let falselyClaimingPlayer = this.getFalselyClaimingPlayer(i);            
             console.log("fining " + falselyClaimingPlayer.getName());
-            falselyClaimingPlayer.removeCoins(2);
-            this.addCourthouseCoins(2);
+            falselyClaimingPlayer.removeCoins(1);
+            this.addCourthouseCoins(1);
         }
     }
     resetClaims() {
@@ -596,7 +669,7 @@ class ServerGame {
     makeAClaim(pTurn) {
         let player = pTurn.getPlayer();
         let dataObject = {};
-        let deck = Deck.createDeck(this.numberOfPlayers());
+        let deck = Deck.createDeck(this.numberOfNonPlaceHolderPlayers());
         dataObject.claimOptions = [];
         for (let i = 0; i < deck.numberOfCards(); i++) {
             let card = deck.getCard(i);
@@ -641,7 +714,7 @@ class ServerGame {
         for(let i = 0; i < pRichestPlayers.length; i +=1) {
             let richestPlayer = pRichestPlayers[i];
             let victimObject = {id: richestPlayer.getId(), name: richestPlayer.getName()};
-            dataObject.push(victimObject);
+            dataObject.victims.push(victimObject);
         }
         
         claimant.getClient().emit("choose bishop victim", dataObject);
@@ -890,7 +963,7 @@ class ServerGame {
         let victim = this.getPlayerById(pData);
         // victim has to guess what they are
         let dataObject = {};
-        let deck = Deck.createDeck(this.numberOfPlayers());
+        let deck = Deck.createDeck(this.numberOfNonPlaceHolderPlayers());
         dataObject.claimOptions = [];
         for (let i = 0; i < deck.numberOfCards(); i++) {
             let card = deck.getCard(i);
@@ -1063,7 +1136,7 @@ class ServerGame {
     }
 
     startGame() {
-        let deck = Deck.createDeck(this.numberOfPlayers());
+        let deck = Deck.createDeck(this.numberOfNonPlaceHolderPlayers());
         deck.shuffle();
         if(this.numberOfPlayers() < 5) {
             let placeHolderPlayer = new ServerPlayer(-1, "#000000", "PlaceHolder1", false, true);
@@ -1083,9 +1156,12 @@ class ServerGame {
             console.log(player.getId() + " has been dealt the " + card.getName() + " card.");            
         }
         this.resetClaims();
+        this.setMandatorySwaps(4);
         this.setIsGameStarted(true);
+        this.setShouldShowGameOver(false);
         this.setAllPlayersNotReady();
         this.setShouldShowCards(true);
+        this.setCurrentPlayerIndex(this.pickRandomPlayerIndex());
         this.updateClientPlayers();
     }
 
@@ -1137,7 +1213,7 @@ class ServerGame {
     }
 
     onStartGame(pClient, pData) {
-        let deck = Deck.createDeck(this.numberOfPlayers());
+        let deck = Deck.createDeck(this.numberOfNonPlaceHolderPlayers());
         deck.shuffle();
         if(this.numberOfPlayers() < 5) {
             let placeHolderPlayer = new ServerPlayer(-1, "#000000", "PlaceHolder1", false, true);
@@ -1247,6 +1323,7 @@ class ServerGame {
             dataObject.shouldShowCards = this.getShouldShowCards();
             dataObject.shouldShowResolution = this.getShouldShowResolution();
             dataObject.shouldShowGameOver = this.getShouldShowGameOver();
+            dataObject.courthouseCoins = this.getCourthouseCoins();
             dataObject.players = [];
             for (let i = 0; i < this.numberOfPlayers(); i++) {
                 let existingPlayer = this.getPlayer(i);
