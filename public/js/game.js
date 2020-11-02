@@ -388,6 +388,7 @@
     updateName() {        
         let nameEdit = document.getElementById("nameEdit");
         let newName = nameEdit.value;
+        document.title = newName + " - Mascarade";
         //this.mLocalPlayer.setName(newName);
       //  this.updatePlayersArea();
 
