@@ -1199,6 +1199,7 @@ class ServerGame {
         this.setReadyReplyMessage("player game over ready");
         this.setShowReady(true);
         this.setShowCards(true);
+        
         this.updateClientPlayers();
         let dataObject = {};
         dataObject.claimsResolution = this.getClaimResolution();
@@ -1273,6 +1274,7 @@ class ServerGame {
         this.setReadyReplyMessage("player ready");
         this.setMandatorySwaps(4);
         this.setIsGameStarted(true);
+        this.setCourthouseCoins(0);
         this.setAllPlayersNotReady();
         this.setShowCards(true);
         this.setShowCoins(true);
