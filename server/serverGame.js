@@ -3,6 +3,9 @@ const { ServerTurn } = require("./serverTurn");
 class ServerGame {
     constructor() {
         this.mPlayers = [];
+        this.initialiseValues();
+    }
+    initialiseValues() {
         this.setIsGameStarted(false);
         this.setShouldShowCards(false);
         this.setShouldShowResolution(false);
@@ -13,6 +16,48 @@ class ServerGame {
         this.resetClaims();
         this.setFines(0);
         this.setReadyReplyMessage("player ready");
+        this.setShowId(true);
+        this.setShowCards(false);
+        this.setShowCoins(false);
+        this.setShowCourthouse(false);
+        this.setShowUpdate(true);
+        this.setShowReady(true);
+    }
+    setShowReady(pShowReady) {
+        this.mShowReady = pShowReady;
+    }
+    getShowReady() {
+        return this.mShowReady;
+    }
+    setShowCourthouse(pShowCourthouse) {
+        this.mShowCourthouse = pShowCourthouse;
+    }
+    getShowCourthouse() {
+        return this.mShowCourthouse;
+    }
+    setShowCards(pShowCards) {
+        this.mShowCards = pShowCards;
+    }
+    getShowCards() {
+        return this.mShowCards;
+    }
+    setShowId(pShowId) {
+        this.mShowId = pShowId;
+    }
+    getShowId() {
+        return this.mShowId;
+    }
+    setShowCoins(pShowCoins) {
+        this.mShowCoins = pShowCoins;
+    }
+    getShowCoins() {
+        return this.mShowCoins;
+    }
+    setShowUpdate(pShowUpdate) {
+        this.mShowUpdate = pShowUpdate;
+    }
+    getShowUpdate() {
+        return this.mShowUpdate;
     }
     setReadyReplyMessage(pReadyReplyMessage) {
         this.mReadyReplyMessage = pReadyReplyMessage;
@@ -222,7 +267,6 @@ class ServerGame {
         client.on("name update", this.onNameUpdate.bind(this, client));
         client.on("end turn", this.endTurn.bind(this, client));
 
-        client.on("start game", this.onStartGame.bind(this, client));
         client.on("hide cards", this.onHideCards.bind(this, client));
         client.on("show cards", this.onShowCards.bind(this, client));
 
@@ -255,7 +299,11 @@ class ServerGame {
         this.updateClientPlayers();
         if(this.areAllPlayersReady()) {
             if(this.getIsGameStarted()) {
-                this.setShouldShowCards(false);
+                this.setShowCards(false);
+                this.setShowCourthouse(true);
+                this.setShowCoins(true);
+                this.setShowUpdate(false);
+                this.setShowReady(false);
                 this.updateClientPlayers();
                 this.startGameLoop();
             }
@@ -269,6 +317,7 @@ class ServerGame {
     }
 
     nextTurn() {
+        this.setShowReady(false);
         let currentPlayer = this.getPlayer(this.getCurrentPlayerIndex());
         while(currentPlayer.getIsPlaceHolder()) {
             this.incrementCurrentPlayerIndex();
@@ -645,6 +694,7 @@ class ServerGame {
         this.setReadyReplyMessage("finish enacting claims");
         this.addCourthouseCoins(this.getFines());
         this.setFines(0);
+        this.setShowReady(true);
         this.updateClientPlayers();
         let dataObject = {};
         dataObject.claimsResolution = this.getClaimResolution();
@@ -666,6 +716,7 @@ class ServerGame {
         this.setAllPlayersNotReady();
         this.setShouldShowResolution(true);
         this.setReadyReplyMessage("player resolution ready");
+        this.setShowReady(true);
         this.updateClientPlayers();
         let dataObject = {};
         dataObject.claimsResolution = this.getClaimResolution();
@@ -1146,10 +1197,11 @@ class ServerGame {
         this.setAllPlayersNotReady();
         this.setShouldShowGameOver(true);
         this.setReadyReplyMessage("player game over ready");
+        this.setShowReady(true);
+        this.setShowCards(true);
         this.updateClientPlayers();
         let dataObject = {};
         dataObject.claimsResolution = this.getClaimResolution();
-        
         let total = this.numberOfPlayers();
         for(let i = 0; i < total; i +=1) {
             let player = this.getPlayer(i);
@@ -1218,11 +1270,14 @@ class ServerGame {
             console.log(player.getId() + " has been dealt the " + card.getName() + " card.");            
         }
         this.resetClaims();
+        this.setReadyReplyMessage("player ready");
         this.setMandatorySwaps(4);
         this.setIsGameStarted(true);
-        this.setShouldShowGameOver(false);
         this.setAllPlayersNotReady();
-        this.setShouldShowCards(true);
+        this.setShowCards(true);
+        this.setShowCoins(true);
+        this.setShowCourthouse(true);
+        this.setShowUpdate(false);
         this.setCurrentPlayerIndex(this.pickRandomPlayerIndex());
         this.updateClientPlayers();
     }
@@ -1249,6 +1304,7 @@ class ServerGame {
                 this.addCourthouseCoins(this.getFines());
                 this.resetClaims();
                 this.setShouldShowResolution(false);
+                this.setShowReady(false);
                 this.updateClientPlayers();
                 this.endTurn();
             }
@@ -1263,6 +1319,7 @@ class ServerGame {
         if(this.areAllPlayersReady()) {
             this.resetClaims();
             this.setShouldShowResolution(false);
+            this.setShowReady(false);
             this.updateClientPlayers();
             this.endTurn();
         }
@@ -1279,30 +1336,7 @@ class ServerGame {
         }
     }    
 
-    onStartGame(pClient, pData) {
-        let deck = Deck.createDeck(this.numberOfNonPlaceHolderPlayers());
-        deck.shuffle();
-        if(this.numberOfPlayers() < 5) {
-            let placeHolderPlayer = new ServerPlayer(-1, "#000000", "PlaceHolder1", false, true);
-            pClient.broadcast.emit("new player", {id: placeHolderPlayer.getId(), colour: placeHolderPlayer.getColour(), name: placeHolderPlayer.getName(), isLocal: false, isPlaceHolder: true});
-            pClient.emit("new player", {id: placeHolderPlayer.getId(), colour: placeHolderPlayer.getColour(), name: placeHolderPlayer.getName(), isLocal: false, isPlaceHolder: true});
-            this.addPlayer(placeHolderPlayer);
-        }
-        if(this.numberOfPlayers() < 6) {
-            let placeHolderPlayer = new ServerPlayer(-2, "#000000", "PlaceHolder2", false, true);
-            pClient.broadcast.emit("new player", {id: placeHolderPlayer.getId(), colour: placeHolderPlayer.getColour(), name: placeHolderPlayer.getName(), isLocal: false, isPlaceHolder: true});
-            pClient.emit("new player", {id: placeHolderPlayer.getId(), colour: placeHolderPlayer.getColour(), name: placeHolderPlayer.getName(), isLocal: false, isPlaceHolder: true});
-            this.addPlayer(placeHolderPlayer);
-        }
-        for(let i = 0; i < this.numberOfPlayers(); i+= 1) {
-            let player = this.getPlayer(i);
-            let card = deck.drawTopCard();
-            player.setCard(card);
-            console.log(player.getId() + " has been dealt the " + card.getName() + " card.");
-            pClient.broadcast.emit("deal card", {id: player.getId(), card: card.getName()});
-            pClient.emit("deal card", {id: player.getId(), card: card.getName()});
-        }
-    };
+   
     onHideCards(pClient, pData) {
         console.log("hiding cards");
         pClient.broadcast.emit("hide cards", {});
@@ -1386,11 +1420,14 @@ class ServerGame {
         for (let i = 0; i < this.numberOfPlayers(); i++) {
             let currentPlayer = this.getPlayer(i);
             let dataObject = {};
+            dataObject.showId = this.getShowId();
+            dataObject.showCards = this.getShowCards();
+            dataObject.showCoins = this.getShowCoins();
+            dataObject.showCourthouse = this.getShowCourthouse();
+            dataObject.showUpdate = this.getShowUpdate();
+            dataObject.showReady = this.getShowReady();
             dataObject.readyReplyMessage = this.getReadyReplyMessage();
-            dataObject.isGameStarted = this.getIsGameStarted();
-            dataObject.shouldShowCards = this.getShouldShowCards();
-            dataObject.shouldShowResolution = this.getShouldShowResolution();
-            dataObject.shouldShowGameOver = this.getShouldShowGameOver();
+            
             dataObject.courthouseCoins = this.getCourthouseCoins();
             dataObject.players = [];
             for (let i = 0; i < this.numberOfPlayers(); i++) {
@@ -1402,8 +1439,10 @@ class ServerGame {
                 playerObject.coins = existingPlayer.getCoins();
                 playerObject.isReady = existingPlayer.getIsReady();
                 playerObject.card = "no card yet";
-                if(existingPlayer.getCard() != null) {
-                    playerObject.card = existingPlayer.getCard().getName();
+                if(this.getShowCards()) {
+                    if(existingPlayer.getCard() != null) {
+                        playerObject.card = existingPlayer.getCard().getName();
+                    }
                 }
                 playerObject.isLocal = false;
                 if(currentPlayer.getId() == existingPlayer.getId()) {

@@ -15,6 +15,43 @@
         this.resizeCanvas();
         this.setFirstVictim(null);
     }
+    setShowReady(pShowReady) {
+        this.mShowReady = pShowReady;
+    }
+    getShowReady() {
+        return this.mShowReady;
+    }
+    setShowCourthouse(pShowCourthouse) {
+        this.mShowCourthouse = pShowCourthouse;
+    }
+    getShowCourthouse() {
+        return this.mShowCourthouse;
+    }
+    setShowCards(pShowCards) {
+        this.mShowCards = pShowCards;
+    }
+    getShowCards() {
+        return this.mShowCards;
+    }
+    setShowId(pShowId) {
+        this.mShowId = pShowId;
+    }
+    getShowId() {
+        return this.mShowId;
+    }
+    setShowCoins(pShowCoins) {
+        this.mShowCoins = pShowCoins;
+    }
+    getShowCoins() {
+        return this.mShowCoins;
+    }
+    setShowUpdate(pShowUpdate) {
+        this.mShowUpdate = pShowUpdate;
+    }
+    getShowUpdate() {
+        return this.mShowUpdate;
+    }
+
     setFirstVictim(pVictim) {
         this.mFirstVictim = pVictim;
     }
@@ -302,7 +339,7 @@
             readyButton.addEventListener("click", this.toggleReady.bind(this), false);
         }
     }
-    updatePlayersArea() {
+    /* updatePlayersArea() {
         let playersArea = document.getElementById("playersArea");
         let playersList = "";
         for(let i = 0; i < this.mPlayers.length; i +=1) {
@@ -325,6 +362,76 @@
         playersList += "<br/>";
         playersList += '<span class="remotePlayer">The Courthouse has ' + this.getCourthouseCoins() + ' coins.';
         playersArea.innerHTML = playersList;
+        
+    } */
+    updatePlayersArea() {
+        let playersArea = document.getElementById("playersArea");
+        let playersList = "";
+        for(let i = 0; i < this.mPlayers.length; i +=1) {
+            let player = this.mPlayers[i];
+            playersList += "";
+            if(player.getIsLocal() == true) {
+                playersList += '<span class="localPlayer">';
+                document.title = player.getName() + " - Mascarade";
+            }
+            else {
+                playersList += '<span class="remotePlayer">';
+            }
+            if(this.getShowId()) {
+                playersList += player.getId() + " : ";
+            }
+            playersList += player.getName() + " ";   
+            if(this.getShowCoins()) { 
+                if(!player.getIsPlaceHolder()) {
+                    playersList += " : " + player.getCoins() + " ";
+                }
+            }
+            if(this.getShowCards()) {
+                if(player.getCard() != null) {
+                    if(player.getCard() != null) {                        
+                        playersList += " - " + player.getCard().getName() + " ";
+                    }
+                }                   
+            }
+            playersList += '</span>';
+            if(this.getShowReady()) {
+                if(player.getIsReady()) {            
+                    if(player.getIsLocal() == true) {
+                        playersList += '<button id="readyButton" type="button">Not Ready</button>';
+                    }
+                    else {
+                        playersList += '<span class="remotePlayer">';
+                        playersList += 'Ready';
+                        playersList += '</span>';
+                    }
+                }
+                else {
+                    if(player.getIsLocal() == true) {
+                        if(this.getShowUpdate()) {
+                            playersList += '<input type="text" id="nameEdit" value = "' + player.getName() + '" /><button id="nameUpdateButton" type="button">Update</button>';
+                        }
+                        playersList += '<button id="readyButton" type="button">Ready</button>';
+                    }
+                    else {
+                        playersList += '<span class="remotePlayer">';
+                        playersList += 'Not Ready';
+                        playersList += '</span>';
+                    }
+
+                }
+            }
+            playersList += "<br/>";
+
+        }
+        playersArea.innerHTML = playersList;
+        let nameUpdateButton = document.getElementById("nameUpdateButton");
+        if(nameUpdateButton != null) {
+            nameUpdateButton.addEventListener("click", this.updateName.bind(this), false);
+        }
+        let readyButton = document.getElementById("readyButton");
+        if(readyButton != null) {
+            readyButton.addEventListener("click", this.toggleReady.bind(this), false);
+        }
         
     }
     toggleReady(event) {
@@ -594,6 +701,12 @@
         let dataPlayers = data.players;
         this.mReadyReplyMessage = data.readyReplyMessage;
         this.setCourthouseCoins(data.courthouseCoins);
+        this.setShowId(data.showId);
+        this.setShowCoins(data.showCoins);
+        this.setShowCards(data.showCards);
+        this.setShowCourthouse(data.showCourthouse);
+        this.setShowUpdate(data.showUpdate);
+        this.setShowReady(data.showReady);
         for(let i = 0; i < dataPlayers.length; i +=1) {
             let playerObject = dataPlayers[i];
             let player = new Player(playerObject.id, playerObject.colour, playerObject.name, playerObject.isLocal, playerObject.isPlaceHolder);
@@ -605,6 +718,7 @@
             }
             this.mPlayers.push(player);
         }
+        this.updatePlayersArea();/* 
         if(data.isGameStarted) {
             let shouldShowCards = data.shouldShowCards;
             if(shouldShowCards) {            
@@ -622,7 +736,7 @@
         }
         else {
             this.updatePlayersAreaLobby();
-        }
+        } */
     }
     claimsResolution(pData) {
         console.log("claims resolution");
