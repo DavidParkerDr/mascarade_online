@@ -423,7 +423,7 @@
             playersList += "<br/>";
 
         }
-        playersList += '<span class="remotePlayer">The Courthouse has ' + this.getCourthouseCoins() + ' coins.';
+        playersList += '<br/><span class="remotePlayer">The Courthouse has ' + this.getCourthouseCoins() + ' coins.';
         playersArea.innerHTML = playersList;
         let nameUpdateButton = document.getElementById("nameUpdateButton");
         if(nameUpdateButton != null) {
