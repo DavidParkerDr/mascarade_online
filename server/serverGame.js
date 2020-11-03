@@ -885,7 +885,7 @@ class ServerGame {
         let claimant = this.getPlayerById(pClient.id);
         let victim = this.getPlayerById(pData.id);
         let tempCoins = claimant.getCoins();
-        claimant.addCoins(victim.getCoins());
+        claimant.setCoins(victim.getCoins());
         victim.setCoins(tempCoins);  
         let claimResolution = claimant.getName() + " is the Witch and swapped fortune with " + victim.getName();
         this.setClaimResolution(claimResolution);  
@@ -1071,7 +1071,7 @@ class ServerGame {
     }
     inquisitorVictimChosen(pClient, pData) {
         let claimant = this.getPlayerById(pClient.id);
-        let victim = this.getPlayerById(pData);
+        let victim = this.getPlayerById(pData.id);
         // victim has to guess what they are
         let dataObject = {};
         let deck = Deck.createDeck(this.numberOfNonPlaceHolderPlayers());
@@ -1098,7 +1098,7 @@ class ServerGame {
     inquisitorVictimGuessed(pClient, pData) {
         let claimant = this.getRightfulClaimant(0);
         let victim = this.getPlayerById(pClient.id);
-        if(victim.getCard().getName() != dData) {
+        if(victim.getCard().getName() != pData) {
             // guessed wrong pay the inquisitor
             let tempCoins = victim.getCoins();
             victim.removeCoins(4);
@@ -1106,7 +1106,7 @@ class ServerGame {
                 tempCoins = 4;
             }
             claimant.addCoins(tempCoins);
-            let claimResolution = claimant.getName() + " is the Inquisitor and has taken" + tempCoins + " coins from " + victim.getName() + " for guessing wrong.";
+            let claimResolution = claimant.getName() + " is the Inquisitor and has taken " + tempCoins + " coins from " + victim.getName() + " for guessing wrong.";
             this.setClaimResolution(claimResolution);
             this.finishEnactingClaims();
         }
