@@ -90,6 +90,7 @@
             playersList += "";
             if(player.getIsLocal() == true) {
                 playersList += '<span class="localPlayer">';
+                document.title = player.getName() + " - Mascarade";
             }
             else {
                 playersList += '<span class="remotePlayer">';
@@ -138,6 +139,7 @@
             playersList += "";
             if(player.getIsLocal() == true) {
                 playersList += '<span class="localPlayer">';
+                document.title = player.getName() + " - Mascarade";
             }
             else {
                 playersList += '<span class="remotePlayer">';
@@ -196,6 +198,7 @@
             playersList += "";
             if(player.getIsLocal() == true) {
                 playersList += '<span class="localPlayer">';
+                document.title = player.getName() + " - Mascarade";
             }
             else {
                 playersList += '<span class="remotePlayer">';
@@ -236,7 +239,7 @@
         playersArea.innerHTML = playersList;
         let readyButton = document.getElementById("readyButton");
         if(readyButton != null) {
-            readyButton.addEventListener("click", this.toggleReadyResolution.bind(this), false);
+            readyButton.addEventListener("click", this.toggleReady.bind(this), false);
         }
     }
     updatePlayersAreaShowGameOver() {
@@ -247,6 +250,7 @@
             playersList += "";
             if(player.getIsLocal() == true) {
                 playersList += '<span class="localPlayer">';
+                document.title = player.getName() + " - Mascarade";
             }
             else {
                 playersList += '<span class="remotePlayer">';
@@ -295,7 +299,7 @@
         playersArea.innerHTML = playersList;
         let readyButton = document.getElementById("readyButton");
         if(readyButton != null) {
-            readyButton.addEventListener("click", this.toggleReadyGameOver.bind(this), false);
+            readyButton.addEventListener("click", this.toggleReady.bind(this), false);
         }
     }
     updatePlayersArea() {
@@ -306,6 +310,7 @@
             playersList += "";
             if(player.getIsLocal() == true) {
                 playersList += '<span class="localPlayer">';
+                document.title = player.getName() + " - Mascarade";
             }
             else {
                 playersList += '<span class="remotePlayer">';
@@ -325,30 +330,12 @@
     toggleReady(event) {
         console.log("readyButton pressed");
         if(event.target.innerText == "Ready") {
-            this.mSocket.emit("player ready");
+            this.mSocket.emit(this.mReadyReplyMessage);
         }
         else {
             this.mSocket.emit("player not ready");
         }
-    }
-    toggleReadyResolution(event) {
-        console.log("readyButton pressed");
-        if(event.target.innerText == "Ready") {
-            this.mSocket.emit("player resolution ready");
-        }
-        else {
-            this.mSocket.emit("player resolution not ready");
-        }
-    }
-    toggleReadyGameOver(event) {
-        console.log("readyButton pressed");
-        if(event.target.innerText == "Ready") {
-            this.mSocket.emit("player game over ready");
-        }
-        else {
-            this.mSocket.emit("player game over not ready");
-        }
-    }
+    }    
 
     // New player
     onNewGame(data) {
@@ -363,7 +350,7 @@
     onNewPlayerId(data) {
         console.log("New player id from server: " + data.id + ', ' + data.colour + ', ' + data.name + ', ' + data.isLocal);
         this.mLocalPlayer = new Player(data.id, data.colour, data.name, true);
-        document.title = data.id;
+        document.title = newName + " - Mascarade";
         this.mPlayers.push(this.mLocalPlayer);
         this.updatePlayersArea();
     };
@@ -605,6 +592,7 @@
         console.log("received player update from server");
         this.mPlayers = [];
         let dataPlayers = data.players;
+        this.mReadyReplyMessage = data.readyReplyMessage;
         this.setCourthouseCoins(data.courthouseCoins);
         for(let i = 0; i < dataPlayers.length; i +=1) {
             let playerObject = dataPlayers[i];
@@ -784,7 +772,7 @@
     spySwapOrNotChoice(pData) {
         let turnInformationArea = document.getElementById("turnInformation");
         let turnInformationContent = '<h3>Turn Information</h3><br/>';
-        turnInformationContent += '<h4>You are the Spy. Choose whether to swap or not with ' + pData.victimName + '.</h4><br/>';
+        turnInformationContent += '<h4>You are the' + pData.playerCard + '. Choose whether to swap or not with ' + pData.victimName + ' the ' + pData.victimCard + '.</h4><br/>';
         turnInformationContent += '<button id="swapButton" type="button">Swap</button>';
         turnInformationContent += '<button id="notButton" type="button">Not</button>';
         turnInformationArea.innerHTML = turnInformationContent;
@@ -917,6 +905,7 @@
             this.mSocket.on("game already started", this.onJoinRejected.bind(this));
 
             this.mSocket.on("claims resolution", this.claimsResolution.bind(this));
+            
             this.mSocket.on("game over", this.gameOver.bind(this));
         }
     };
