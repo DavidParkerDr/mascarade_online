@@ -394,22 +394,14 @@
             }
             if(this.getShowReady()) {
                 if(player.getIsReady()) {            
-                    if(player.getIsLocal() == true) {
-                        playersList += '<button id="readyButton" type="button">Not Ready</button>';
-                    }
-                    else {
-                        playersList += 'Ready';
-                    }
+                    playersList += '<div class="readyOrNot">Ready</div>';
                 }
                 else {
+                    playersList += '<div class="readyOrNot">Not Ready</div>';
                     if(player.getIsLocal() == true) {
                         if(this.getShowUpdate()) {
                             playersList += '<input type="text" id="nameEdit" value = "' + player.getName() + '" /><button id="nameUpdateButton" type="button">Update</button>';
                         }
-                        playersList += '<button id="readyButton" type="button">Ready</button>';
-                    }
-                    else {
-                        playersList += 'Not Ready';
                     }
 
                 }

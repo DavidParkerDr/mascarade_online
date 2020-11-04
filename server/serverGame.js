@@ -21,6 +21,8 @@ class ServerGame {
         this.setShowCourthouse(false);
         this.setShowUpdate(true);
         this.setShowReady(true);
+        let lobbyTurn = new ServerTurn(null);
+        this.addTurn(lobbyTurn);
     }
     setShowReady(pShowReady) {
         this.mShowReady = pShowReady;
@@ -218,13 +220,7 @@ class ServerGame {
         // Listen for name update message
         client.on("name update", this.onNameUpdate.bind(this, client));
         client.on("end turn", this.endTurn.bind(this, client));
-
-        client.on("hide cards", this.onHideCards.bind(this, client));
-        client.on("show cards", this.onShowCards.bind(this, client));
-
-        client.on("player ready", this.onPlayerReady.bind(this, client));
-        client.on("player not ready", this.onPlayerNotReady.bind(this, client));
-
+        
         client.on("decisionMade", this.decisionMade.bind(this, client));
         client.on("finish enacting claims", this.onPlayerFinishEnactingClaims.bind(this, client));
         client.on("bishop victim chosen", this.bishopVictimChosen.bind(this, client));
@@ -243,27 +239,87 @@ class ServerGame {
 
     };
 
-    onPlayerReady(pClient, pData) {
-        let player = this.getPlayerById(pClient.id);
-        if (player != null) {
+    
+    areYouReady(pData) {
+        let choiceMade = pData.choiceMade;
+        let player = this.getPlayerById(pData.decisionMaker);
+        let logEntry = player.getName() + ' is ';
+        if(choiceMade == "ready") {
             player.setIsReady(true);
+            logEntry += 'ready.';
         }
-        this.updateClientPlayers();
-        if(this.areAllPlayersReady()) {
-            if(this.getIsGameStarted()) {
-                this.setShowCards(false);
-                this.setShowCourthouse(true);
-                this.setShowCoins(true);
-                this.setShowUpdate(false);
-                this.setShowReady(false);
-                this.updateClientPlayers();
-                this.startGameLoop();
-            }
-            else {
-                this.startGame();
-            }
+        else {
+            // not ready
+            player.setIsReady(false);
+            logEntry += 'not ready.';
+        }
+        let turn = this.getLatestTurn();
+        turn.addLogEntry(logEntry);
+        if(!this.areAllPlayersReady()) {
+            this.updateClientPlayers();        
+            this.sendAreYouReady(player, !player.getIsReady());
+        }
+        else {
+            this.everybodyReady();
         }
     }
+    everybodyReady() {
+        if(this.getIsGameStarted()) {
+            this.setShowCards(false);
+            this.setShowCourthouse(true);
+            this.setShowCoins(true);
+            this.setShowUpdate(false);
+            this.setShowReady(false);
+            this.updateClientPlayers();
+            this.startGameLoop();
+        }
+        else {
+            this.startGame();
+        }
+    }
+
+    startGame() {
+        let dealingTurn = new ServerTurn(null);
+        this.addTurn(dealingTurn);
+        let deck = Deck.createDeck(this.numberOfNonPlaceHolderPlayers());
+        deck.shuffle();
+        if(this.numberOfPlayers() < 5) {
+            let placeHolderPlayer = new ServerPlayer(-1, "#000000", "PlaceHolder1", false, true);
+            placeHolderPlayer.setIsReady(true);
+            this.addPlayer(placeHolderPlayer);
+            let logEntry = "Less than 5 players, creating a place holder player for the extra card.";
+            dealingTurn.addLogEntry(logEntry);
+        }
+        if(this.numberOfPlayers() < 6) {
+            let placeHolderPlayer = new ServerPlayer(-2, "#000000", "PlaceHolder2", false, true);
+            placeHolderPlayer.setIsReady(true);
+            this.addPlayer(placeHolderPlayer);
+            let logEntry = "Less than 6 players, creating a place holder player for the extra card.";
+            dealingTurn.addLogEntry(logEntry);
+        }
+        for(let i = 0; i < this.numberOfPlayers(); i+= 1) {
+            let player = this.getPlayer(i);
+            let card = deck.drawTopCard();
+            player.setCard(card);
+            player.setCoins(6);
+            console.log(player.getName() + " has been dealt the " + card.getName() + " card.");
+            let logEntry = player.getName() + " has been dealt the " + card.getName() + " card.";
+            dealingTurn.addLogEntry(logEntry);            
+        }
+        this.setReadyReplyMessage("player ready");
+        this.setMandatorySwaps(4);
+        this.setIsGameStarted(true);
+        this.setCourthouseCoins(0);
+        this.setAllPlayersNotReady();
+        this.setShowCards(true);
+        this.setShowCoins(true);
+        this.setShowCourthouse(true);
+        this.setShowUpdate(false);
+        this.setCurrentPlayerIndex(this.pickRandomPlayerIndex());
+        this.updateClientPlayers();
+        this.sendAreYouReadyToAll();
+    }
+
     startGameLoop() {
         this.nextTurn();
     }
@@ -278,6 +334,33 @@ class ServerGame {
         let turn = new ServerTurn(currentPlayer);
         this.addTurn(turn);
         this.sendTurnOptions();
+    }
+
+    sendAreYouReady(pPlayer, pReady = false) {
+        let dataObject = {};
+        dataObject.replyMessage = "decisionMade";
+        dataObject.choiceType = "areYouReady";
+        dataObject.turnOptions = [];
+        let turnOption = {};
+        if(pReady) {
+            turnOption.id = "ready";
+            turnOption.text = "Ready"
+        }
+        else {
+            turnOption.id = "notReady";
+            turnOption.text = "Not Ready"
+        }
+        dataObject.turnOptions.push(turnOption);
+        dataObject.decisionMessage = "Are you ready to continue?";
+        dataObject.bonusData = [];
+        dataObject.decisionMaker = pPlayer.getId();    
+        pPlayer.getClient().emit("makeADecision", dataObject);    
+    }
+    sendAreYouReadyToAll() {
+        for(let i = 0; i < this.numberOfNonPlaceHolderPlayers(); i +=1) {
+            let player = this.getPlayer(i);
+            this.sendAreYouReady(player, true);
+        }
     }
 
     sendTurnOptions() {
@@ -329,10 +412,7 @@ class ServerGame {
     }
 
     decisionMade(pClient, pData) {
-        let turn = this.getLatestTurn();
-        let player = turn.getPlayer();
         let choiceType = pData.choiceType;
-        let choiceMade = pData.choiceMade;
         if(choiceType == "turnChoice") {
             this.turnChoiceMade(pData);
         }        
@@ -350,6 +430,9 @@ class ServerGame {
         }
         else if(choiceType == "keptQuiet") {
             this.keptQuiet(pData);
+        }
+        else if(choiceType == "areYouReady") {
+            this.areYouReady(pData);
         }
         
     }
@@ -1255,46 +1338,7 @@ class ServerGame {
         }
     }
 
-    startGame() {
-        let turn = new ServerTurn(null);
-        this.addTurn(turn);
-        let deck = Deck.createDeck(this.numberOfNonPlaceHolderPlayers());
-        deck.shuffle();
-        if(this.numberOfPlayers() < 5) {
-            let placeHolderPlayer = new ServerPlayer(-1, "#000000", "PlaceHolder1", false, true);
-            placeHolderPlayer.setIsReady(true);
-            this.addPlayer(placeHolderPlayer);
-            let logEntry = "Less than 5 players, creating a place holder player for the extra card.";
-            turn.addLogEntry(logEntry);
-        }
-        if(this.numberOfPlayers() < 6) {
-            let placeHolderPlayer = new ServerPlayer(-2, "#000000", "PlaceHolder2", false, true);
-            placeHolderPlayer.setIsReady(true);
-            this.addPlayer(placeHolderPlayer);
-            let logEntry = "Less than 6 players, creating a place holder player for the extra card.";
-            turn.addLogEntry(logEntry);
-        }
-        for(let i = 0; i < this.numberOfPlayers(); i+= 1) {
-            let player = this.getPlayer(i);
-            let card = deck.drawTopCard();
-            player.setCard(card);
-            player.setCoins(6);
-            console.log(player.getName() + " has been dealt the " + card.getName() + " card.");
-            let logEntry = player.getName() + " has been dealt the " + card.getName() + " card.";
-            turn.addLogEntry(logEntry);            
-        }
-        this.setReadyReplyMessage("player ready");
-        this.setMandatorySwaps(4);
-        this.setIsGameStarted(true);
-        this.setCourthouseCoins(0);
-        this.setAllPlayersNotReady();
-        this.setShowCards(true);
-        this.setShowCoins(true);
-        this.setShowCourthouse(true);
-        this.setShowUpdate(false);
-        this.setCurrentPlayerIndex(this.pickRandomPlayerIndex());
-        this.updateClientPlayers();
-    }
+    
 
     onPlayerNotReady(pClient, pData) {
         let player = this.getPlayerById(pClient.id);
@@ -1426,6 +1470,7 @@ class ServerGame {
         // add new player to list of players
         this.addPlayer(newPlayer);
         this.updateClientPlayers();
+        this.sendAreYouReady(newPlayer, true);
             
     };
 
@@ -1441,6 +1486,7 @@ class ServerGame {
     }
 
     updateClientPlayers() {
+        console.log("updating client players area");
         let turn = this.getLatestTurn();
         for (let i = 0; i < this.numberOfPlayers(); i++) {
             let currentPlayer = this.getPlayer(i);
