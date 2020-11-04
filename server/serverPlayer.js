@@ -17,6 +17,20 @@ class ServerPlayer extends Player {
         }
         return this.getClient().id == this.getId();
     }
+    getJsonObject(pIncludeCard = false) {
+        let personObject = {};
+        personObject.name = this.getName();
+        personObject.isReady = this.getIsReady();
+        personObject.coins = this.getCoins();
+        personObject.isPlaceHolder = this.getIsPlaceHolder();
+        if(pIncludeCard) {
+            let card = this.getCard();
+            if(card != null) {
+                personObject.card = this.getCard().getName();
+            }
+        }
+        return personObject;
+    }
 }
 if (typeof exports !== 'undefined') {
     exports.ServerPlayer = ServerPlayer;

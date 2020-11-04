@@ -5,6 +5,6 @@ canvas {
 	display: block;
 }
 
-span.localPlayer {
+div.localPlayer {
 	font-weight: bold;
 }

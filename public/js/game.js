@@ -369,13 +369,14 @@
         let playersList = "";
         for(let i = 0; i < this.mPlayers.length; i +=1) {
             let player = this.mPlayers[i];
-            playersList += "";
+            playersList += '';
+            
             if(player.getIsLocal() == true) {
-                playersList += '<span class="localPlayer">';
+                playersList += '<div class = "localPlayer">';
                 document.title = player.getName() + " - Mascarade";
             }
             else {
-                playersList += '<span class="remotePlayer">';
+                playersList += '<div class = "remotePlayer">';
             }
             if(this.getShowId()) {
                 playersList += player.getId() + " : ";
@@ -393,16 +394,13 @@
                     }
                 }                   
             }
-            playersList += '</span>';
             if(this.getShowReady()) {
                 if(player.getIsReady()) {            
                     if(player.getIsLocal() == true) {
                         playersList += '<button id="readyButton" type="button">Not Ready</button>';
                     }
                     else {
-                        playersList += '<span class="remotePlayer">';
                         playersList += 'Ready';
-                        playersList += '</span>';
                     }
                 }
                 else {
@@ -413,17 +411,19 @@
                         playersList += '<button id="readyButton" type="button">Ready</button>';
                     }
                     else {
-                        playersList += '<span class="remotePlayer">';
                         playersList += 'Not Ready';
-                        playersList += '</span>';
                     }
 
                 }
             }
-            playersList += "<br/>";
+            playersList += "</div>";
 
         }
-        playersList += '<br/><span class="remotePlayer">The Courthouse has ' + this.getCourthouseCoins() + ' coins.';
+        if(this.getShowCourthouse()) {
+            playersList += '<div class="courthouse">';
+            playersList += 'The Courthouse has ' + this.getCourthouseCoins() + ' coins.';
+            playersList += '</div>';
+        }
         playersArea.innerHTML = playersList;
         let nameUpdateButton = document.getElementById("nameUpdateButton");
         if(nameUpdateButton != null) {
