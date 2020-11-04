@@ -37,6 +37,11 @@ class ServerTurn {
         }
         this.setFines(fines);
     }
+    getJsonObject() {
+        let turnObject = {};        
+        turnObject.logEntries = this.mLog;
+        return turnObject;
+    }
     addLogEntry(pLogEntry) {
         this.mLog.push(pLogEntry);
     }

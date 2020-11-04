@@ -366,11 +366,10 @@
     } */
     updatePlayersArea() {
         let playersArea = document.getElementById("playersArea");
-        let playersList = "";
+        let playersList = '';
+        playersList += '<div class="sectionHeading">Players</div>';            
         for(let i = 0; i < this.mPlayers.length; i +=1) {
             let player = this.mPlayers[i];
-            playersList += '';
-            
             if(player.getIsLocal() == true) {
                 playersList += '<div class = "localPlayer">';
                 document.title = player.getName() + " - Mascarade";
@@ -379,20 +378,19 @@
                 playersList += '<div class = "remotePlayer">';
             }
             if(this.getShowId()) {
-                playersList += player.getId() + " : ";
+                playersList += '<div class = "playerId">';
+                playersList += player.getId();
+                playersList += '</div>';
             }
-            playersList += player.getName() + " ";   
+            playersList += '<div class = "playerName">';
+            playersList += player.getName();
+            playersList += '</div>';
             if(this.getShowCoins()) { 
                 if(!player.getIsPlaceHolder()) {
-                    playersList += " : " + player.getCoins() + " ";
+                    playersList += '<div class = "playerCoins">';
+                    playersList += player.getCoins() + " coins.";
+                    playersList += '</div>';
                 }
-            }
-            if(this.getShowCards()) {
-                if(player.getCard() != null) {
-                    if(player.getCard() != null) {                        
-                        playersList += " - " + player.getCard().getName() + " ";
-                    }
-                }                   
             }
             if(this.getShowReady()) {
                 if(player.getIsReady()) {            
@@ -435,6 +433,18 @@
         }
         
     }
+    updateTurnLog(pTurn) {
+        let logArea = document.getElementById("turnLog");
+        let logList = '';
+        logList += '<h3>Turn Log</h3>';
+        for(let i = 0; i < pTurn.logEntries.length; i+=1) {
+            logList += '<div class="logEntry">';
+            logList += pTurn.logEntries[i];
+            logList += '</div>';
+        }
+        logArea.innerHTML = logList;
+    }
+    
     toggleReady(event) {
         console.log("readyButton pressed");
         if(event.target.innerText == "Ready") {
@@ -494,66 +504,48 @@
     startGame() {
         this.mSocket.emit("start game", {});
     }
-
-    hideCards() {
-        this.mSocket.emit("hide cards", {});
+    handleDecision(pReplyMessage, pData) {
+        this.clearDecisionArea();
+        this.mSocket.emit(pReplyMessage, pData);
     }
-
-    showCards() {
-        this.mSocket.emit("show cards", {});
-    }
-
-    onDealCard(data) {
-        let card = new Card(data.card);
-        let player = this.getPlayerById(data.id);
-        player.setCard(card);
-        this.updatePlayersArea();
-        console.log("deal card");
-    }
-
-    onHideCards(data) {
-        console.log("hiding cards");
-        for(let i = 0; i < this.mPlayers.length; i +=1) {
-            let player = this.mPlayers[i];
-            player.hideCard();
-        }
-        this.updatePlayersArea();
-    }
-    onShowCards(data) {
-        console.log("showing cards");
-        for(let i = 0; i < this.mPlayers.length; i +=1) {
-            let player = this.mPlayers[i];
-            player.showCard();
-        }
-        this.updatePlayersArea();
-    }
-    onYourTurn(pData) {
-        let turnInformationArea = document.getElementById("turnInformation");
-        let turnInformationContent = '<h3>Turn Information</h3><br/>';
-        turnInformationContent += '<h4>It\'s your turn, what do you want to do?</h4><br/>';
+    
+    makeADecision(pData) {
+        let turnInformationArea = document.getElementById("decisionArea");
+        let turnInformationContent = '<div class= "sectionHeading">Make a decision</div>';
+        let choiceType = pData.choiceType;
+        let decisionMessage = pData.decisionMessage;
+        let decisionMaker = pData.decisionMaker;
+        turnInformationContent += '<div class="decisionMessage">'
+        turnInformationContent += decisionMessage;
+        turnInformationContent += '</div>'
         for(let i = 0; i < pData.turnOptions.length; i+= 1) {
             let turnOption = pData.turnOptions[i];
-            turnInformationContent += '<button id="' + turnOption.id + 'Button" type="button">' + turnOption.text + '</button>';
+            let buttonId = turnOption.id + 'Button';
+            turnInformationContent += '<button id="' + buttonId + '" type="button">' + turnOption.text + '</button>';
         }
-
         turnInformationArea.innerHTML = turnInformationContent;
-        let lookAtCardButton = document.getElementById("lookAtCardButton");
-        if(lookAtCardButton != null) {
-            lookAtCardButton.addEventListener("click", this.lookAtCard.bind(this), false);
-        }
-        let swapOrNotButton = document.getElementById("swapOrNotButton");
-        if(swapOrNotButton != null) {
-            swapOrNotButton.addEventListener("click", this.swapOrNot.bind(this), false);
-        }
-        let makeAClaimButton = document.getElementById("makeAClaimButton");
-        if(makeAClaimButton != null) {
-            makeAClaimButton.addEventListener("click", this.makeAClaim.bind(this), false);
+        let replyMessage = pData.replyMessage;
+        for(let i = 0; i < pData.turnOptions.length; i+= 1) {
+            let turnOption = pData.turnOptions[i];
+            let returnData = {}
+            returnData.decisionMaker = decisionMaker;
+            returnData.choiceType = choiceType;
+            returnData.choiceMade = turnOption.id;
+            returnData.bonusData = pData.bonusData;            
+            let buttonId = turnOption.id + 'Button';
+            let button = document.getElementById(buttonId);
+            if(button != null) {
+                button.addEventListener("click", this.handleDecision.bind(this, replyMessage, returnData), false);
+            }
         }
 
     }
-    lookAtCard() {
-        this.mSocket.emit("turn choice made", {choice: "lookAtCard"});
+
+    clearDecisionArea() {
+        let turnInformationArea = document.getElementById("decisionArea");
+        turnInformationArea.innerHTML = "";
     }
+    
     lookAtCardResult(pData) {
         let card = pData.card;
         let turnInformationArea = document.getElementById("turnInformation");
@@ -631,9 +623,6 @@
     endTurn() {
         this.mSocket.emit("end turn", {});
     }
-    swapOrNot() {
-        this.mSocket.emit("turn choice made", {choice: "swapOrNot"});
-    }
     swapOrNotResult(pData) {
         let players = pData.players;
         let turnInformationArea = document.getElementById("turnInformation");
@@ -678,9 +667,6 @@
     notWithChoice(pPlayerId) {
         this.mSocket.emit("turn choice made", {choice: "notWithPlayerChosen", playerid: pPlayerId});
     }
-    makeAClaim() {
-        this.mSocket.emit("turn choice made", {choice: "makeAClaim"});
-    }
     onOtherTurn(pData) {
         let turnInformationArea = document.getElementById("turnInformation");
         let turnInformationContent = '<h3>Turn Information</h3><br/>';
@@ -719,7 +705,8 @@
             }
             this.mPlayers.push(player);
         }
-        this.updatePlayersArea();/* 
+        this.updatePlayersArea();
+        this.updateTurnLog(data.turn);/* 
         if(data.isGameStarted) {
             let shouldShowCards = data.shouldShowCards;
             if(shouldShowCards) {            
@@ -991,21 +978,13 @@
 
             this.mSocket.on("new game", this.onNewGame.bind(this));
 
-            this.mSocket.on("deal card", this.onDealCard.bind(this));
-            this.mSocket.on("hide cards", this.onHideCards.bind(this));
-            this.mSocket.on("show cards", this.onShowCards.bind(this));
-
-            this.mSocket.on("update players", this.onUpdatePlayers.bind(this));
-            this.mSocket.on("your turn", this.onYourTurn.bind(this));
+             this.mSocket.on("update players", this.onUpdatePlayers.bind(this));
+            this.mSocket.on("makeADecision", this.makeADecision.bind(this));
             this.mSocket.on("other turn", this.onOtherTurn.bind(this));
 
-            this.mSocket.on("look at card", this.lookAtCardResult.bind(this));
-
-            this.mSocket.on("swap or not", this.swapOrNotResult.bind(this));
             this.mSocket.on("swap or not result", this.swapOrNotChoice.bind(this));
 
-            this.mSocket.on("make a claim", this.makeAClaimResult.bind(this));
-
+            
             this.mSocket.on("hearing claims", this.hearingClaims.bind(this));
             this.mSocket.on("respond to claim", this.respondToClaim.bind(this));
 

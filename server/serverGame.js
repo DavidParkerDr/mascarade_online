@@ -225,7 +225,7 @@ class ServerGame {
         client.on("player ready", this.onPlayerReady.bind(this, client));
         client.on("player not ready", this.onPlayerNotReady.bind(this, client));
 
-        client.on("turn choice made", this.turnChoice.bind(this, client));
+        client.on("decisionMade", this.decisionMade.bind(this, client));
         client.on("finish enacting claims", this.onPlayerFinishEnactingClaims.bind(this, client));
         client.on("bishop victim chosen", this.bishopVictimChosen.bind(this, client));
         client.on("witch victim chosen", this.witchVictimChosen.bind(this, client));
@@ -284,7 +284,11 @@ class ServerGame {
         let turn = this.getLatestTurn();
         let player = turn.getPlayer();
         let dataObject = {};
+        dataObject.replyMessage = "decisionMade";
+        dataObject.choiceType = "turnChoice";
         dataObject.turnOptions = [];
+        dataObject.bonusData = [];
+        dataObject.decisionMaker = player.getId();
         if(this.getMandatorySwaps() == 0) {
             let lookTurnOption = {};
             lookTurnOption.id = "lookAtCard";
@@ -301,58 +305,140 @@ class ServerGame {
             claimTurnOption.text = "Make a Claim";
             dataObject.turnOptions.push(claimTurnOption);   
         }
+        dataObject.decisionMessage = "It's your turn, what do you want to do?";
         this.decrementMandatorySwaps();     
-        player.getClient().emit("your turn", dataObject);
+        player.getClient().emit("makeADecision", dataObject);
         let otherDataObject = {};
-        otherDataObject.playerName = player.getName();
-        otherDataObject.message = "They are deciding what to do.";
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != player.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
-            }
-        }
+        let logEntry = "It's " + player.getName() + "'s turn, they are deciding what to do.";
+        turn.addLogEntry(logEntry);
+        this.updateClientPlayers();
     }
-
-    turnChoice(pClient, pData) {
+    turnChoiceMade(pData) {
+        let choiceMade = pData.choiceMade;
         let turn = this.getLatestTurn();
         let player = turn.getPlayer();
-        if(pClient.id == player.getId()) {
-            if(pData.choice == "lookAtCard") {
-                this.lookAtCard();
-            }
-            else if(pData.choice == "swapOrNot") {
-                this.swapOrNot();
-            }
-            else if(pData.choice == "swapOrNotPlayerChosen") {
-                this.swapOrNotPlayerChosen(pData.playerid);
-            }
-            else if(pData.choice == "swapWithPlayerChosen") {
-                this.swapWithPlayerChosen(pData.playerid);
-            }
-            else if(pData.choice == "notWithPlayerChosen") {
-                this.notWithPlayerChosen(pData.playerid);
-            }
-            else if(pData.choice == "makeAClaim") {
-                this.makeAClaim();
-            }
-            else if(pData.choice == "madeAClaim") {
-                this.madeAClaim(pData.claimOption);
-            }
+        if(choiceMade == "lookAtCard") {
+            this.lookAtCard();
         }
-        else {
-            if(pData.choice == "madeACounterClaim") {
-                this.madeACounterClaim(pClient.id);
-            }
-            else if(pData.choice == "keptQuiet") {
-                this.keptQuiet(pClient.id);
-            }
+        else if(choiceMade == "swapOrNot") {
+            this.chooseSwapOrNotTarget(player.getId(), player.getId());
+        }
+        else if(choiceMade == "makeAClaim") {
+            this.makeAClaim();
         }
     }
 
+    decisionMade(pClient, pData) {
+        let turn = this.getLatestTurn();
+        let player = turn.getPlayer();
+        let choiceType = pData.choiceType;
+        let choiceMade = pData.choiceMade;
+        if(choiceType == "turnChoice") {
+            this.turnChoiceMade(pData);
+        }        
+        else if(choiceType == "swapOrNotPlayerChoice") {
+            this.chooseToSwapOrNot(pData);
+        }
+        else if(choiceType == "swapOrNotWithPlayerChosen") {
+            this.swapOrNotWithPlayerChosen(pData);
+        }      
+        else if(choiceType == "madeAClaim") {
+            this.madeAClaim(pData);
+        }
+        else if(choiceType == "madeACounterClaim") {
+            this.madeACounterClaim(pData);
+        }
+        else if(choiceType == "keptQuiet") {
+            this.keptQuiet(pData);
+        }
+        
+    }
+    chooseSwapOrNotTarget(pDecisionMaker, pPreviousTarget = null) {
+        let turn = this.getLatestTurn();
+        let player = this.getPlayerById(pDecisionMaker);
+        let dataObject = {};
+        dataObject.replyMessage = "decisionMade";
+        dataObject.decisionMaker = pDecisionMaker;
+        dataObject.choiceType = "swapOrNotPlayerChoice";        
+        dataObject.bonusData = [];
+        if(pPreviousTarget != null) {
+            dataObject.bonusData.push(pPreviousTarget);
+        }
+        dataObject.turnOptions = [];
+        for (let i = 0; i < this.numberOfPlayers(); i++) {
+            let otherPlayer = this.getPlayer(i);
+            if(player.getId() != otherPlayer.getId()) {                    
+                let choiceObject = {};
+                choiceObject.id = otherPlayer.getId();
+                choiceObject.text = otherPlayer.getName();
+                dataObject.turnOptions.push(choiceObject);
+            }            
+        }
+        dataObject.decisionMessage = "Choose a swap (or not) target.";
+        let logEntry = player.getName() + " is choosing";
+        if(pPreviousTarget == null) {
+            logEntry += " a swap or not target.";
+        }
+        else {
+            let firstTarget = this.getPlayerById(pPreviousTarget);
+            logEntry += " another swap or not target to go with " + firstTarget.getName() + ".";
+        }
+        turn.addLogEntry(logEntry);
+        player.getClient().emit("makeADecision", dataObject);
+        
+        this.updateClientPlayers();
+    }
+    chooseToSwapOrNot(pData) {
+        let turn = this.getLatestTurn();
+        let player = turn.getPlayer();
+        let bonusData = pData.bonusData;
+        if(bonusData.length == 0) {
+            this.chooseSwapOrNotTarget(pData.choiceMade);
+        }
+        else {
+            let bonusData = pData.bonusData;
+            let firstTargetId = bonusData[0];
+            let firstTarget = this.getPlayerById(firstTargetId);
+            let secondTargetId = pData.choiceMade;
+            let secondTarget = this.getPlayerById(secondTargetId);
+            let dataObject = {};
+            bonusData.push(secondTargetId);
+            dataObject.bonusData = bonusData;
+            dataObject.replyMessage = "decisionMade";
+            dataObject.choiceType = "swapOrNotWithPlayerChosen";        
+            dataObject.turnOptions = [];
+            let choiceObject = {};
+            choiceObject.id = "swap";
+            choiceObject.text = "Swap";
+            dataObject.turnOptions.push(choiceObject);
+            choiceObject = {};
+            choiceObject.id = "not";
+            choiceObject.text = "Not";
+            dataObject.turnOptions.push(choiceObject);
+            dataObject.decisionMessage = "Choose whether to swap or not " + firstTarget.getName() + " with " + secondTarget.getName() + ".";
+            let logEntry = firstTarget.getName() + " is swapping with " + secondTarget.getName() + "; or are they?";
+            turn.addLogEntry(logEntry);
+            this.updateClientPlayers();
+            player.getClient().emit("makeADecision", dataObject);
+        }
+        
+        
+    }
+    swapOrNotWithPlayerChosen(pData) {
+        let choiceMade = pData.choiceMade;
+        if(choiceMade = "swap") {
+            let bonusData = pData.bonusData;
+            let firstTargetId = bonusData[0];
+            let firstTarget = this.getPlayerById(firstTargetId);
+            let secondTargetId = bonusData[1];
+            let secondTarget = this.getPlayerById(secondTargetId);
+
+            let tempCard = firstTarget.getCard();
+            firstTarget.setCard(secondTarget.getCard());
+            secondTarget.setCard(tempCard);
+        }
+        this.endTurn();
+    }
     madeACounterClaim(pPlayerId) {
         let turn = this.getLatestTurn();
         let player = this.getPlayerById(pPlayerId);
@@ -1094,74 +1180,7 @@ class ServerGame {
             this.finishEnactingClaims();
         }
     }
-    swapOrNot() {
-        let turn = this.getLatestTurn();
-        let player = turn.getPlayer();
-        let dataObject = {};
-        dataObject.players = [];
-        for (let i = 0; i < this.numberOfPlayers(); i++) {
-            let existingPlayer = this.getPlayer(i);
-            if(player.getId() != existingPlayer.getId()) {                    
-                let playerObject = {};
-                playerObject.id = existingPlayer.getId();
-                playerObject.name = existingPlayer.getName();
-                dataObject.players.push(playerObject);
-            }            
-        }
-        player.getClient().emit("swap or not", dataObject);
-        let logEntry = player.getName() + " is choosing who to swap with; or are they?";
-        turn.addLogEntry(logEntry)
-        let otherDataObject = {};
-        otherDataObject.playerName = player.getName();
-        otherDataObject.message = "They are choosing who to swap with; or are they?";
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != player.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
-            }
-        }
-    }
-    swapOrNotPlayerChosen(pPlayerId) {
-        let turn = this.getLatestTurn();
-        let player = turn.getPlayer();
-        let chosenPlayer = this.getPlayerById(pPlayerId);
-        let dataObject = {};
-        dataObject.playerid = pPlayerId;
-        dataObject.playerName = chosenPlayer.getName();
-        player.getClient().emit("swap or not result", dataObject);
-        let logEntry = player.getName() + " is swapping with " + chosenPlayer.getName() + "; or are they?";
-        turn.addLogEntry(logEntry);
-        
-        let otherDataObject = {};
-        otherDataObject.playerName = player.getName();
-        otherDataObject.message = 'They are swapping with ' + chosenPlayer.getName() + '; or are they?';
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != player.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
-            }
-        }
-    }
-    swapWithPlayerChosen(pPlayerId) {
-        let turn = this.getLatestTurn();
-        let player = turn.getPlayer();
-        let otherPlayer = this.getPlayerById(pPlayerId);
-
-        let tempCard = player.getCard();
-
-        player.setCard(otherPlayer.getCard());
-        otherPlayer.setCard(tempCard);
-        this.endTurn();
-    }
-    notWithPlayerChosen() {
-        this.endTurn();
-    }
+    
     endTurn(pClient, pData) {
         let turn = this.getLatestTurn();
         let winner = this.hasAnyOneWon();
@@ -1237,24 +1256,32 @@ class ServerGame {
     }
 
     startGame() {
+        let turn = new ServerTurn(null);
+        this.addTurn(turn);
         let deck = Deck.createDeck(this.numberOfNonPlaceHolderPlayers());
         deck.shuffle();
         if(this.numberOfPlayers() < 5) {
             let placeHolderPlayer = new ServerPlayer(-1, "#000000", "PlaceHolder1", false, true);
             placeHolderPlayer.setIsReady(true);
             this.addPlayer(placeHolderPlayer);
+            let logEntry = "Less than 5 players, creating a place holder player for the extra card.";
+            turn.addLogEntry(logEntry);
         }
         if(this.numberOfPlayers() < 6) {
             let placeHolderPlayer = new ServerPlayer(-2, "#000000", "PlaceHolder2", false, true);
             placeHolderPlayer.setIsReady(true);
             this.addPlayer(placeHolderPlayer);
+            let logEntry = "Less than 6 players, creating a place holder player for the extra card.";
+            turn.addLogEntry(logEntry);
         }
         for(let i = 0; i < this.numberOfPlayers(); i+= 1) {
             let player = this.getPlayer(i);
             let card = deck.drawTopCard();
             player.setCard(card);
             player.setCoins(6);
-            console.log(player.getId() + " has been dealt the " + card.getName() + " card.");            
+            console.log(player.getName() + " has been dealt the " + card.getName() + " card.");
+            let logEntry = player.getName() + " has been dealt the " + card.getName() + " card.";
+            turn.addLogEntry(logEntry);            
         }
         this.setReadyReplyMessage("player ready");
         this.setMandatorySwaps(4);
@@ -1414,7 +1441,7 @@ class ServerGame {
     }
 
     updateClientPlayers() {
-        
+        let turn = this.getLatestTurn();
         for (let i = 0; i < this.numberOfPlayers(); i++) {
             let currentPlayer = this.getPlayer(i);
             let dataObject = {};
@@ -1429,6 +1456,13 @@ class ServerGame {
             dataObject.players = this.buildPlayersDataObject(currentPlayer, this.getShowCards());
             if(this.getShowCourthouse()) {
                 dataObject.courthouseCoins = this.getCourthouseCoins();
+            }
+            if(turn != null) {
+                dataObject.turn = turn.getJsonObject();
+            }
+            else {
+                dataObject.turn = {};
+                dataObject.turn.logEntries = [];
             }
             
             let client = currentPlayer.getClient();

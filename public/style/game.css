@@ -7,4 +7,19 @@ canvas {
 
 div.localPlayer {
 	font-weight: bold;
+	background-color: lightgray;
+}
+
+div.playerName {	
+	margin: 10px;
+	display: inline-block;
+}
+div.playerCoins {	
+	margin: 10px;
+	display: inline-block;
+}
+div.sectionHeading {
+	font-size: large;
+	margin: 10px;
+	font-weight: bold;
 }
