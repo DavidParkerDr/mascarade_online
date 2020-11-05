@@ -883,6 +883,12 @@ class ServerGame {
     finishEnactingClaims() {
         let turn = this.getLatestTurn();
         console.log("finishing enacting claims");
+        if(turn.getFines() > 0) {
+            this.addCourthouseCoins(turn.getFines());
+            logEntry = "The collective fines of " + turn.getFines() + "has been paid to the Courthouse.";
+            turn.addLogEntry(logEntry);    
+            this.updateClientPlayers();
+        }
         this.setAllPlayersNotReady();
         this.sendAreYouReadyToAll("nextTurn");       
     }
