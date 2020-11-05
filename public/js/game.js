@@ -410,8 +410,9 @@
 
         }
         if(this.getShowCourthouse()) {
-            playersList += '<div class="courthouse">';
-            playersList += 'The Courthouse has ' + this.getCourthouseCoins() + ' coins.';
+            playersList += '<div class="courthouseSection">';
+            playersList += '<div class="sectionHeading">The Courthouse</div>';   
+            playersList += '<div class="courthouse" >The Courthouse has ' + this.getCourthouseCoins() + ' coins.</div>';
             playersList += '</div>';
         }
         playersArea.innerHTML = playersList;
@@ -428,7 +429,7 @@
     updateTurnLog(pTurn) {
         let logArea = document.getElementById("turnLog");
         let logList = '';
-        logList += '<h3>Turn Log</h3>';
+        logList += '<div class="sectionHeading">Turn Log</div>';
         for(let i = 0; i < pTurn.logEntries.length; i+=1) {
             logList += '<div class="logEntry">';
             logList += pTurn.logEntries[i];
@@ -502,20 +503,26 @@
     }
     
     makeADecision(pData) {
-        let turnInformationArea = document.getElementById("decisionArea");
-        let turnInformationContent = '<div class= "sectionHeading">Make a decision</div>';
+        let decisionArea = document.getElementById("decisionArea");
         let choiceType = pData.choiceType;
         let decisionMessage = pData.decisionMessage;
         let decisionMaker = pData.decisionMaker;
-        turnInformationContent += '<div class="decisionMessage">'
-        turnInformationContent += decisionMessage;
-        turnInformationContent += '</div>'
-        for(let i = 0; i < pData.turnOptions.length; i+= 1) {
-            let turnOption = pData.turnOptions[i];
-            let buttonId = turnOption.id + 'Button';
-            turnInformationContent += '<button id="' + buttonId + '" type="button">' + turnOption.text + '</button>';
+        let decisionContent = '';
+        if(choiceType != "clearDecisionArea") {
+
+            decisionContent = '<div class= "sectionHeading">Make a decision</div>';        
+            decisionContent += '<div class="decisionMessage">'
+            decisionContent += decisionMessage;
+            decisionContent += '</div>'
+            decisionContent += '<div class="decisionButtons">'
+            for(let i = 0; i < pData.turnOptions.length; i+= 1) {
+                let turnOption = pData.turnOptions[i];
+                let buttonId = turnOption.id + 'Button';
+                decisionContent += '<button id="' + buttonId + '" type="button">' + turnOption.text + '</button>';
+            }
+            decisionContent += '</div>'
         }
-        turnInformationArea.innerHTML = turnInformationContent;
+        decisionArea.innerHTML = decisionContent;
         let replyMessage = pData.replyMessage;
         for(let i = 0; i < pData.turnOptions.length; i+= 1) {
             let turnOption = pData.turnOptions[i];

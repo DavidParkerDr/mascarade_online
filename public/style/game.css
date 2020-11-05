@@ -4,12 +4,21 @@ body {
 canvas {
 	display: block;
 }
-
+div.section {
+	border: solid;
+}
 div.localPlayer {
 	font-weight: bold;
 	background-color: lightgray;
 }
-
+div.decisionMessage {
+	margin: 10px;
+	display: block;
+}
+div.decisionButtons {
+	margin: 10px;
+	display: block;
+}
 div.playerName {	
 	margin: 10px;
 	display: inline-block;
@@ -22,8 +31,16 @@ div.playerCoins {
 	margin: 10px;
 	display: inline-block;
 }
+div.logEntry {	
+	margin: 10px;
+	display: block;
+}
 div.sectionHeading {
 	font-size: large;
 	margin: 10px;
 	font-weight: bold;
+}
+div.courthouse {
+	margin: 10px;
+	display: block;
 }

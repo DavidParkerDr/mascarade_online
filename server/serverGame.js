@@ -243,6 +243,7 @@ class ServerGame {
     areYouReady(pData) {
         let choiceMade = pData.choiceMade;
         let player = this.getPlayerById(pData.decisionMaker);
+        let whereNext = pData.bonusData[0];
         let logEntry = player.getName() + ' is ';
         if(choiceMade == "ready") {
             player.setIsReady(true);
@@ -257,24 +258,44 @@ class ServerGame {
         turn.addLogEntry(logEntry);
         if(!this.areAllPlayersReady()) {
             this.updateClientPlayers();        
-            this.sendAreYouReady(player, !player.getIsReady());
+            this.sendAreYouReady(player, whereNext, !player.getIsReady());
         }
         else {
-            this.everybodyReady();
+            this.clearDecisionAreas();
+            this.everybodyReady(whereNext);
         }
     }
-    everybodyReady() {
-        if(this.getIsGameStarted()) {
+    clearDecisionAreas() {
+        for(let i = 0; i < this.numberOfNonPlaceHolderPlayers(); i +=1) {
+            let player = this.getPlayer(i);
+            this.clearDecisionArea(player);
+        }
+    }
+    clearDecisionArea(pPlayer) {
+        let dataObject = {};
+        dataObject.replyMessage = "none";
+        dataObject.choiceType = "clearDecisionArea";
+        
+        dataObject.decisionMessage = "none";
+        dataObject.bonusData = [];
+        dataObject.decisionMaker = pPlayer.getId();    
+        pPlayer.getClient().emit("makeADecision", dataObject);   
+    }
+    everybodyReady(pWhereNext) {
+        if(pWhereNext == "startTurns") {
             this.setShowCards(false);
             this.setShowCourthouse(true);
             this.setShowCoins(true);
             this.setShowUpdate(false);
             this.setShowReady(false);
             this.updateClientPlayers();
-            this.startGameLoop();
+            this.nextTurn();
+        }
+        else if(pWhereNext == "dealCards") {
+            this.startGame();
         }
         else {
-            this.startGame();
+            this.endTurn();
         }
     }
 
@@ -317,11 +338,7 @@ class ServerGame {
         this.setShowUpdate(false);
         this.setCurrentPlayerIndex(this.pickRandomPlayerIndex());
         this.updateClientPlayers();
-        this.sendAreYouReadyToAll();
-    }
-
-    startGameLoop() {
-        this.nextTurn();
+        this.sendAreYouReadyToAll("startTurns");
     }
 
     nextTurn() {
@@ -336,7 +353,7 @@ class ServerGame {
         this.sendTurnOptions();
     }
 
-    sendAreYouReady(pPlayer, pReady = false) {
+    sendAreYouReady(pPlayer, pWhereNext, pReady = false) {
         let dataObject = {};
         dataObject.replyMessage = "decisionMade";
         dataObject.choiceType = "areYouReady";
@@ -344,22 +361,23 @@ class ServerGame {
         let turnOption = {};
         if(pReady) {
             turnOption.id = "ready";
-            turnOption.text = "Ready"
+            turnOption.text = "Make Ready"
         }
         else {
             turnOption.id = "notReady";
-            turnOption.text = "Not Ready"
+            turnOption.text = "Make Them Wait"
         }
         dataObject.turnOptions.push(turnOption);
         dataObject.decisionMessage = "Are you ready to continue?";
         dataObject.bonusData = [];
+        dataObject.bonusData.push(pWhereNext);
         dataObject.decisionMaker = pPlayer.getId();    
         pPlayer.getClient().emit("makeADecision", dataObject);    
     }
-    sendAreYouReadyToAll() {
+    sendAreYouReadyToAll(pWhereNext) {
         for(let i = 0; i < this.numberOfNonPlaceHolderPlayers(); i +=1) {
             let player = this.getPlayer(i);
-            this.sendAreYouReady(player, true);
+            this.sendAreYouReady(player, pWhereNext, true);
         }
     }
 
@@ -431,11 +449,14 @@ class ServerGame {
         else if(choiceType == "madeACounterClaim") {
             this.madeACounterClaim(pData);
         }
-        else if(choiceType == "keptQuiet") {
-            this.keptQuiet(pData);
+        else if(choiceType == "witchVictimChosen") {
+            this.witchVictimChosen(pData);
         }
         else if(choiceType == "areYouReady") {
             this.areYouReady(pData);
+        }
+        else if(choiceType == "bishopVictimChosen") {
+            this.bishopVictimChosen(pData);
         }
         
     }
@@ -525,11 +546,21 @@ class ServerGame {
         }
         this.endTurn();
     }
-    madeACounterClaim(pPlayerId) {
+    madeACounterClaim(pData) {
         let turn = this.getLatestTurn();
-        let player = this.getPlayerById(pPlayerId);
-        console.log(pPlayerId + " made counter claim. " + player.getName());
-        turn.addClaimingPlayer(player);
+        let choiceMade = pData.choiceMade;
+        let logEntry = "";
+        let nextClaimant = this.getPlayerById(pData.decisionMaker);
+        if(choiceMade == "yes") {
+            logEntry = nextClaimant.getName() + " has announced that they, in fact, are the " + turn.getClaim() + ".";
+            turn.addClaimingPlayer(nextClaimant);
+        
+        }
+        else {
+            logEntry = nextClaimant.getName() + " has remained very quiet on the matter of whether they are the " + turn.getClaim() + ".";
+        }
+        turn.addLogEntry(logEntry);
+        this.updateClientPlayers();
         this.subsequentClaim();
     }
     keptQuiet(pPlayerId) {
@@ -538,12 +569,16 @@ class ServerGame {
         console.log(pPlayerId + " kept quiet. " + player.getName());
         this.subsequentClaim();
     }
-    madeAClaim(pClaimOption) {
+    madeAClaim(pData) {
         let turn = this.getLatestTurn();
         let player = turn.getPlayer();
+        let claimOption = pData.choiceMade;
         turn.setClaimPlayerIndex(this.getCurrentPlayerIndex());
         turn.addClaimingPlayer(player);
-        turn.setClaim(pClaimOption);
+        turn.setClaim(claimOption);
+        let logEntry = player.getName() + " claims to be the " + claimOption + ".";
+        turn.addLogEntry(logEntry);
+        this.updateClientPlayers();
         this.subsequentClaim();
     }
     subsequentClaim()
@@ -557,32 +592,39 @@ class ServerGame {
             nextClaimant = this.getPlayer(this.getCurrentPlayerIndex());
         }
         if(this.getCurrentPlayerIndex() != turn.getClaimPlayerIndex()) {
-            
             let dataObject = {};
-            dataObject.player = nextClaimant.getName();
-            dataObject.claimOption = turn.getClaim();
-            dataObject.claims = [];
-            for (let i = 0; i < this.numberOfClaimingPlayers(); i +=1) {
-                let claimingPlayer = turn.getClaimingPlayer(i);
-                dataObject.claims.push(claimingPlayer.getName());
-            }
-            nextClaimant.getClient().emit("respond to claim", dataObject);
-            let total = this.numberOfPlayers();
-            for(let i = 0; i < total; i +=1) {
-                let player = this.getPlayer(i);
-                if (player.getId() != nextClaimant.getId()) {
-                    if(!player.getIsPlaceHolder()) {
-                        player.getClient().emit("hearing claims", dataObject);
-                    }
-                }
-            }
+            dataObject.replyMessage = "decisionMade";
+            dataObject.choiceType = "madeACounterClaim";
+            dataObject.turnOptions = [];
+            dataObject.bonusData = [];
+            dataObject.decisionMaker = nextClaimant.getId();
+            dataObject.decisionMessage = "Some people are claiming to be the " + turn.getClaim() + ". Are you the true " + turn.getClaim() + "?";
+            let turnOption = {};
+            turnOption.id = "yes";
+            turnOption.text = "No, I am the " + turn.getClaim() + "!";
+            dataObject.turnOptions.push(turnOption);
+            turnOption = {};
+            turnOption.id = "no";
+            turnOption.text = "Keep quiet.";
+            dataObject.turnOptions.push(turnOption);
+            let logEntry = nextClaimant.getName() + " is responding to the claim of being the " +  turn.getClaim() + ".";
+            turn.addLogEntry(logEntry);
+            this.updateClientPlayers();
+            nextClaimant.getClient().emit("makeADecision", dataObject);
+            
         }
         else {
+            let logEntry = "Everyone has responded to the claim of being the " + turn.getClaim() + ".";
+            turn.addLogEntry(logEntry);
+            this.updateClientPlayers();
             // everyone has had a chance to respond
             console.log("everyone has responded to the claim");
-            if(this.numberOfClaimingPlayers() > 1) {
+            if(turn.numberOfClaimingPlayers() > 1) {
                 // resolve competing claims
                 console.log("there were multiple claims");
+                let logEntry = "There was more than one claim to be the " + turn.getClaim() + ".";
+                turn.addLogEntry(logEntry);
+                this.updateClientPlayers();
                 this.resolveClaims();
             }
             else {
@@ -590,27 +632,35 @@ class ServerGame {
                 console.log("the claim was uncontested");
                 turn.addRightfulClaimant(turn.getClaimingPlayer(0));
                 let logEntry = turn.getClaimingPlayer(0).getName() + "'s claim to be the " + turn.getClaim() + " was uncontested.";
-                this.addLogEntry(logEntry);
+                turn.addLogEntry(logEntry);
+                this.updateClientPlayers();
             }                 
             
 
-            if(this.numberofRightfulClaimants() == 0) {
+            if(turn.numberofRightfulClaimants() == 0) {
                 // no successful claims
                 console.log("everyone was wrong");
                 let logEntry = "Everyone was wrong.";
-                this.addLogEntry(logEntry);                         
-                
+                turn.addLogEntry(logEntry);                            
+                this.addCourthouseCoins(turn.getFines());
+                logEntry = "Their collective fines of " + turn.getFines() + "has been paid to the Courthouse.";
+                turn.addLogEntry(logEntry);     
+                this.updateClientPlayers();
+                this.endTurn();
             }
-            else if(this.numberofRightfulClaimants() == 1) {
-                let logEntry = turn.getRightfulClaimant(0).getName() + "'s claim to be the " + turn.getClaim() + " is righteous.";
-                this.addLogEntry(logEntry);
+            else {
+                if(turn.numberofRightfulClaimants() == 1) {
+                    let logEntry = turn.getRightfulClaimant(0).getName() + "'s claim to be the " + turn.getClaim() + " is righteous.";
+                    turn.addLogEntry(logEntry);
+                    this.updateClientPlayers();
+                }
+                else if(turn.numberofRightfulClaimants() == 2) {
+                    let logEntry = turn.getRightfulClaimant(0).getName() + " and " + turn.getClaimingPlayer(1).getName() + " are both " + turn.getClaim() + "s.";
+                    turn.addLogEntry(logEntry); 
+                    this.updateClientPlayers();   
+                }
+                this.enactClaim();
             }
-            else if(this.numberofRightfulClaimants() == 2) {
-                let logEntry = turn.getRightfulClaimant(0).getName() + " and " + turn.getClaimingPlayer(1).getName() + " are both " + turn.getClaim() + "s.";
-                this.addLogEntry(logEntry);    
-            }
-            
-            this.finaliseClaims();      
             
         }
     }
@@ -638,9 +688,11 @@ class ServerGame {
             // take the coins from the courthouse
             let rightfulClaimant = turn.getRightfulClaimant(0);
             rightfulClaimant.addCoins(this.getCourthouseCoins());
+            this.setCourthouseCoins(0);                  
             let logEntry = rightfulClaimant.getName() + " is the Judge and took " + this.getCourthouseCoins() +  " coins from the Courthouse.";
-            this.addLogEntry(logEntry);
-            this.setCourthouseCoins(0);         
+            turn.addLogEntry(logEntry);
+            this.updateClientPlayers();
+               
             this.finishEnactingClaims();    
         }
         else if(claim == "Bishop") {
@@ -670,7 +722,8 @@ class ServerGame {
                 }
                 rightfulClaimant.addCoins(tempCoins);
                 let logEntry = rightfulClaimant.getName() + " is the Bishop and took " + tempCoins +  " coins from " + richestPlayer.getName();
-                this.addLogEntry(logEntry);
+                turn.addLogEntry(logEntry);
+                this.updateClientPlayers();
                 this.finishEnactingClaims();
             }
             else {
@@ -684,8 +737,10 @@ class ServerGame {
             let rightfulClaimant = turn.getRightfulClaimant(0);
             rightfulClaimant.addCoins(3);
             let logEntry = rightfulClaimant.getName() + " is the King and took " + 3 +  " coins from the Bank.";
-            this.addLogEntry(logEntry);
+            turn.addLogEntry(logEntry);
+            this.updateClientPlayers();
             this.finishEnactingClaims();
+            
         }
         else if(claim == "Fool") {
             // take 1 coin and swap or not two other players cards
@@ -699,7 +754,8 @@ class ServerGame {
             let rightfulClaimant = turn.getRightfulClaimant(0);
             rightfulClaimant.addCoins(2);
             let logEntry = rightfulClaimant.getName() + " is the Queen and took " + 2 +  " coins from the Bank.";
-            this.addLogEntry(logEntry);
+            turn.addLogEntry(logEntry);
+            this.updateClientPlayers();
             this.finishEnactingClaims();
         }
         else if(claim == "Thief") {
@@ -742,8 +798,9 @@ class ServerGame {
                 tempCoins2 = 1;
             }
             rightfulClaimant.addCoins(tempCoins2);
-            let logEntry = rightfulClaimant.getName() + " is the Thief and took " + tempCoins1 +  " coins from " + leftVictim.getName() + " and " + tempCoins2 + " coins from " + rightVictim.getName();
-            this.addLogEntry(logEntry);
+            let logEntry = rightfulClaimant.getName() + " is the Thief and took " + tempCoins1 +  " coin from " + leftVictim.getName() + " and " + tempCoins2 + " coin from " + rightVictim.getName();
+            turn.addLogEntry(logEntry);
+            this.updateClientPlayers();
             this.finishEnactingClaims();
         }
         else if(claim == "Witch") {
@@ -779,7 +836,8 @@ class ServerGame {
                 logEntry += " is a Peasant";
             }
             logEntry += " and have taken " + coins + " coins from the Bank.";
-            this.addLogEntry(logEntry);
+            turn.addLogEntry(logEntry);
+            this.updateClientPlayers();
             this.finishEnactingClaims();
         }
         else if(claim == "Cheat") {
@@ -788,12 +846,14 @@ class ServerGame {
             if(rightfulClaimant.getCoins() >= 10) {
                 // cheat wins
                 let logEntry = rightfulClaimant.getName() + " is the Cheat and has won with " + rightfulClaimant.getCoins() + " coins.";
-                this.addLogEntry(logEntry);
+                turn.addLogEntry(logEntry);
+                this.updateClientPlayers();
                 this.endGame();
             }
             else {
                 let logEntry = rightfulClaimant.getName() + " is the Cheat but is too poor to win.";
-                this.addLogEntry(logEntry);
+                turn.addLogEntry(logEntry);
+                this.updateClientPlayers();
                 this.finishEnactingClaims();
             }
             
@@ -809,85 +869,50 @@ class ServerGame {
             if(rightfulClaimant.getCoins() < 10) {
                 rightfulClaimant.setCoins(10);
                 let logEntry = rightfulClaimant.getName() + " is the Widow and has topped up her fortune to 10 coins.";
-                this.addLogEntry(logEntry);
+                turn.addLogEntry(logEntry);
             }
             else {
                 let logEntry = rightfulClaimant.getName() + " is the Widow but they already had 10 coins.";
-                this.addLogEntry(logEntry);
+                turn.addLogEntry(logEntry);
+
             }
+            this.updateClientPlayers();
             this.finishEnactingClaims();
         }
     }
     finishEnactingClaims() {
         let turn = this.getLatestTurn();
-        console.log("finishing enacting claims:  " + turn.getClaimResolution());
+        console.log("finishing enacting claims");
         this.setAllPlayersNotReady();
-        this.setShouldShowResolution(true);
-        // update reply message here
-        this.setReadyReplyMessage("finish enacting claims");
-        this.addCourthouseCoins(turn.getFines());
-        this.setShowReady(true);
-        this.updateClientPlayers();
-        let dataObject = {};
-        dataObject.claimsResolution = turn.getClaimResolution();
-        dataObject.claim = turn.getClaim(); 
-        dataObject.falseClaims = [];
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if(!player.getIsPlaceHolder()) {
-                player.getClient().emit("claims resolution", dataObject);
-            }            
-        }
+        this.sendAreYouReadyToAll("nextTurn");       
     }
 
-    finaliseClaims() {
-        let turn = this.getLatestTurn();
-        console.log("finaliseClaims " + turn.getClaimResolution());
-        //this.fineFalseClaims();
-        this.checkMandatorySwaps();
-        this.setAllPlayersNotReady();
-        this.setShouldShowResolution(true);
-        this.setReadyReplyMessage("player resolution ready");
-        this.setShowReady(true);
-        this.updateClientPlayers();
-        let dataObject = {};
-        dataObject.claimsResolution = turn.getClaimResolution();
-        dataObject.claim = turn.getClaim();      
-        dataObject.falseClaims = [];
-        for(let i = 0; i < turn.numberOfFalselyClaimingPlayers(); i +=1) {
-            let claimObject = {};
-            let falselyClaimingPlayer = turn.getFalselyClaimingPlayer(i);  
-            claimObject.player = falselyClaimingPlayer.getName();
-            claimObject.card = falselyClaimingPlayer.getCard().getName();
-            dataObject.falseClaims.push(claimObject);
-        }
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if(!player.getIsPlaceHolder()) {
-                player.getClient().emit("claims resolution", dataObject);
-            }            
-        }
-        
-
-    }
+    
     resolveClaims() {
         let turn = this.getLatestTurn();
         for(let i = 0; i < turn.numberOfClaimingPlayers(); i +=1) {
             let claimingPlayer = turn.getClaimingPlayer(i);
             let card = claimingPlayer.getCard();
+            let logEntry = "";
             if(card.getName() != turn.getClaim()) {
                 // false claim
                 turn.addFalselyClaimingPlayer(claimingPlayer);
+                logEntry = claimingPlayer.getName() + " was found to be falsely claiming to be the " + turn.getClaim() + " when they were actually the " + card.getName() + ".";
+                
             }
             else {
                 // rightful claim
                 turn.addRightfulClaimant(claimingPlayer);
+                //logEntry = claimingPlayer.getName + " was found to be falsely claiming to be the " + turn.getClaim() + " when they were actually the " + card.getName() + ".";
+                
             }
+            turn.addLogEntry(logEntry);                
+            this.updateClientPlayers();
         }
         turn.fineFalseClaims();
-        
+        let logEntry = "The guilty parties have been fined 1 coin each for their falsehoods. This is held in escrow until the end of the turn when it will be handed over to the Courthouse."
+        turn.addLogEntry(logEntry); 
+        this.updateClientPlayers();               
     }
     
     
@@ -896,7 +921,7 @@ class ServerGame {
         let player = turn.getPlayer();
         let dataObject = {};
         dataObject.replyMessage = "decisionMade";
-        dataObject.choiceType = "makeAClaim";
+        dataObject.choiceType = "madeAClaim";
         dataObject.turnOptions = [];
         dataObject.bonusData = [];
         dataObject.decisionMaker = player.getId();
@@ -910,6 +935,7 @@ class ServerGame {
             turnOption.text = card.getName();
             dataObject.turnOptions.push(turnOption);
         }
+        dataObject.decisionMessage = "Who do you think you are?";
         player.getClient().emit("makeADecision", dataObject);
         let logEntry = player.getName() + " is preparing an annoucement!";
         turn.addLogEntry(logEntry);
@@ -943,32 +969,27 @@ class ServerGame {
         let turn = this.getLatestTurn();
         let claimant = pClaimant;
         let dataObject = {};
-        dataObject.victims = [];
+        dataObject.replyMessage = "decisionMade";
+        dataObject.choiceType = "bishopVictimChosen";
+        dataObject.turnOptions = [];
+        dataObject.bonusData = [];
+        dataObject.decisionMaker = claimant.getId();
+        dataObject.decisionMessage = "As the Bishop, you can take 2 coins from one of these players."
         for(let i = 0; i < pRichestPlayers.length; i +=1) {
             let richestPlayer = pRichestPlayers[i];
-            let victimObject = {id: richestPlayer.getId(), name: richestPlayer.getName()};
-            dataObject.victims.push(victimObject);
+            let turnOption = {id: richestPlayer.getId(), text: richestPlayer.getName()};
+            dataObject.turnOptions.push(turnOption);
         }
-        let logEntry = "They are the Bishop, choosing their victim.";
+        let logEntry = claimant.getName() + ", the Bishop, is choosing their victim from amongst the richest players.";
         turn.addLogEntry(logEntry);
-        claimant.getClient().emit("choose bishop victim", dataObject);
-        let otherDataObject = {};
-        otherDataObject.playerName = claimant.getName();
-        otherDataObject.message = "They are the Bishop, choosing their victim.";
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != claimant.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
-            }
-        }
+        this.updateClientPlayers();
+        claimant.getClient().emit("makeADecision", dataObject);
+        
     }
-    bishopVictimChosen(pClient, pData) {
+    bishopVictimChosen(pData) {
         let turn = this.getLatestTurn();
-        let claimant = this.getPlayerById(pClient.id);
-        let victim = this.getPlayerById(pData.id);
+        let claimant = this.getPlayerById(pData.pDecisionMaker);
+        let victim = this.getPlayerById(pData.choiceMade);
         
         let tempCoins = victim.getCoins();
         victim.removeCoins(2);
@@ -978,48 +999,44 @@ class ServerGame {
         claimant.addCoins(tempCoins);
         let logEntry = claimant.getName() + " is the Bishop and took " + tempCoins +  " coins from " + victim.getName();
         turn.addLogEntry(logEntry);
+        this.updateClientPlayers();
         this.finishEnactingClaims();
     }
     chooseWitchVictim(pClaimant) {
         let turn = this.getLatestTurn();
         let claimant = pClaimant;
         let dataObject = {};
-        dataObject.victims = [];
-        for (let i = 0; i < this.numberOfPlayers(); i++) {
-            let existingPlayer = this.getPlayer(i);
-            if(claimant.getId() != existingPlayer.getId()) {                    
-                let playerObject = {};
-                playerObject.id = existingPlayer.getId();
-                playerObject.name = existingPlayer.getName();
-                dataObject.victims.push(playerObject);
-            }            
-        }
-        let logEntry = claimant.getName() + " is the Witch, choosing their victim.";
-        turn.addLogEntry(logEntry);
-        claimant.getClient().emit("choose witch victim", dataObject);
-        let otherDataObject = {};
-        otherDataObject.playerName = claimant.getName();
-        otherDataObject.message = "They are the Witch, choosing their victim.";
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != claimant.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
+        dataObject.replyMessage = "decisionMade";
+        dataObject.choiceType = "witchVictimChosen";
+        dataObject.turnOptions = [];
+        dataObject.bonusData = [];
+        dataObject.decisionMaker = claimant.getId();
+        dataObject.decisionMessage = "As the Witch, you can swap fortunes with one of these players."
+        for(let i = 0; i < this.numberOfNonPlaceHolderPlayers(); i +=1) {
+            let otherPlayer = this.getPlayer(i);
+            if(otherPlayer.getId() != claimant.getId()) {
+                let turnOption = {id: otherPlayer.getId(), text: otherPlayer.getName()};
+                dataObject.turnOptions.push(turnOption);
             }
         }
+        let logEntry = claimant.getName() + ", the Witch, is choosing their victim from amongst the other players.";
+        turn.addLogEntry(logEntry);
+        this.updateClientPlayers();
+        claimant.getClient().emit("makeADecision", dataObject);
     }
     witchVictimChosen(pClient, pData) {
         let turn = this.getLatestTurn();
-        let claimant = this.getPlayerById(pClient.id);
-        let victim = this.getPlayerById(pData.id);
+        let claimant = this.getPlayerById(pData.pDecisionMaker);
+        let victim = this.getPlayerById(pData.choiceMade);
+        
         let tempCoins = claimant.getCoins();
         claimant.setCoins(victim.getCoins());
         victim.setCoins(tempCoins);  
-        let logEntry = claimant.getName() + " is the Witch and swapped fortune with " + victim.getName();
+     
+        let logEntry = claimant.getName() + " is the Witch and took " + tempCoins +  " coins from " + victim.getName() + " leaving them with a paltry " + victim.getCoins() + ".";
         turn.addLogEntry(logEntry);
-        this.finishEnactingClaims();
+        this.updateClientPlayers();
+        this.finishEnactingClaims();     
     }
     chooseFoolVictims(pClaimant) {
         let turn = this.getLatestTurn();
@@ -1281,7 +1298,8 @@ class ServerGame {
         }
         else {
             let logEntry = winner.getName() + " has won with " + winner.getCoins() + " coins.";
-            turn.addLogEntry(logEntry)
+            turn.addLogEntry(logEntry);
+            this.updateClientPlayers();
             this.endGame();
         }
     }
@@ -1466,7 +1484,7 @@ class ServerGame {
         // add new player to list of players
         this.addPlayer(newPlayer);
         this.updateClientPlayers();
-        this.sendAreYouReady(newPlayer, true);
+        this.sendAreYouReady(newPlayer, "dealCards", true);
             
     };
 
