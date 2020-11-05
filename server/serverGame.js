@@ -307,7 +307,7 @@ class ServerGame {
             dealingTurn.addLogEntry(logEntry);            
         }
         this.setReadyReplyMessage("player ready");
-        this.setMandatorySwaps(4);
+        this.setMandatorySwaps(0);
         this.setIsGameStarted(true);
         this.setCourthouseCoins(0);
         this.setAllPlayersNotReady();
@@ -421,7 +421,10 @@ class ServerGame {
         }
         else if(choiceType == "swapOrNotWithPlayerChosen") {
             this.swapOrNotWithPlayerChosen(pData);
-        }      
+        }   
+        else if(choiceType == "lookedAtCard") {
+            this.endTurn();
+        }   
         else if(choiceType == "madeAClaim") {
             this.madeAClaim(pData);
         }
@@ -892,43 +895,48 @@ class ServerGame {
         let turn = this.getLatestTurn();
         let player = turn.getPlayer();
         let dataObject = {};
+        dataObject.replyMessage = "decisionMade";
+        dataObject.choiceType = "makeAClaim";
+        dataObject.turnOptions = [];
+        dataObject.bonusData = [];
+        dataObject.decisionMaker = player.getId();
+
         let deck = Deck.createDeck(this.numberOfNonPlaceHolderPlayers());
         dataObject.claimOptions = [];
         for (let i = 0; i < deck.numberOfCards(); i++) {
             let card = deck.getCard(i);
-            dataObject.claimOptions.push(card.getName());         
+            let turnOption = {};
+            turnOption.id = card.getName();
+            turnOption.text = card.getName();
+            dataObject.turnOptions.push(turnOption);
         }
-        player.getClient().emit("make a claim", dataObject);
-        let otherDataObject = {};
-        otherDataObject.playerName = player.getName();
-        otherDataObject.message = "They are preparing an announcement!";
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != player.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
-            }
-        }
+        player.getClient().emit("makeADecision", dataObject);
+        let logEntry = player.getName() + " is preparing an annoucement!";
+        turn.addLogEntry(logEntry);
+        this.updateClientPlayers();
+        
     }
 
     lookAtCard() {
         let turn = this.getLatestTurn();
         let player = turn.getPlayer();
-        player.getClient().emit("look at card", {card: player.getCard().getName()});
-        let otherDataObject = {};
-        otherDataObject.playerName = player.getName();
-        otherDataObject.message = "They are looking at their card.";
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != player.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
-            }
-        }
+        let dataObject = {};
+        dataObject.replyMessage = "decisionMade";
+        dataObject.choiceType = "lookedAtCard";
+        dataObject.turnOptions = [];
+        dataObject.bonusData = [];
+        dataObject.decisionMaker = player.getId();
+       
+        let swapTurnOption = {};
+        swapTurnOption.id = "endTurn";
+        swapTurnOption.text = "End Turn";
+        dataObject.turnOptions.push(swapTurnOption);
+        dataObject.decisionMessage = "You are looking at your card. You are the " + player.getCard().getName() + ".";
+        this.decrementMandatorySwaps();     
+        player.getClient().emit("makeADecision", dataObject);
+        let logEntry = player.getName() + " is looking at their card.";
+        turn.addLogEntry(logEntry);
+        this.updateClientPlayers();
     }
 
     chooseBishopVictim(pClaimant, pRichestPlayers) {
@@ -1394,18 +1402,6 @@ class ServerGame {
         }
     }    
 
-   
-    onHideCards(pClient, pData) {
-        console.log("hiding cards");
-        pClient.broadcast.emit("hide cards", {});
-        pClient.emit("hide cards", {});
-    };
-    
-    onShowCards(pClient, pData) {
-        console.log("showing cards");
-        pClient.broadcast.emit("show cards", {});
-        pClient.emit("show cards", {});
-    };
     onClientDisconnect(pClient, pData) {
         console.log("Player has disconnected: "+pClient.id);
         var removePlayer = this.getPlayerById(pClient.id);
