@@ -421,7 +421,7 @@ class ServerGame {
             this.lookAtCard();
         }
         else if(choiceMade == "swapOrNot") {
-            this.chooseSwapOrNotTarget(player.getId(), player.getId());
+            this.chooseSwapOrNotTarget(player.getId(), "Choose a swap (or not) target.", player.getId());
         }
         else if(choiceMade == "makeAClaim") {
             this.makeAClaim();
@@ -459,7 +459,7 @@ class ServerGame {
         }
         
     }
-    chooseSwapOrNotTarget(pDecisionMaker, pPreviousTarget = null) {
+    chooseSwapOrNotTarget(pDecisionMaker, pDecisionMessage, pPreviousTarget = null) {
         let turn = this.getLatestTurn();
         let player = this.getPlayerById(pDecisionMaker);
         let dataObject = {};
@@ -480,7 +480,7 @@ class ServerGame {
                 dataObject.turnOptions.push(choiceObject);
             }            
         }
-        dataObject.decisionMessage = "Choose a swap (or not) target.";
+        dataObject.decisionMessage = pDecisionMessage;
         let logEntry = player.getName() + " is choosing";
         if(pPreviousTarget == null) {
             logEntry += " a swap or not target.";
@@ -498,8 +498,9 @@ class ServerGame {
         let turn = this.getLatestTurn();
         let player = turn.getPlayer();
         let bonusData = pData.bonusData;
+        let chosenPlayer = pData.choiceMade;
         if(bonusData.length == 0) {
-            this.chooseSwapOrNotTarget(pData.choiceMade);
+            this.chooseSwapOrNotTarget(pData.decisionMaker, pData.decisionMessage, chosenPlayer);
         }
         else {
             let bonusData = pData.bonusData;
@@ -1054,90 +1055,10 @@ class ServerGame {
         this.updateClientPlayers();
         this.finishEnactingClaims();     
     }
-    chooseFoolVictims(pClaimant) {
-        let turn = this.getLatestTurn();
-        let claimant = pClaimant;
-        let dataObject = {};
-        dataObject.victims = [];
-        for (let i = 0; i < this.numberOfPlayers(); i++) {
-            let existingPlayer = this.getPlayer(i);
-            if(claimant.getId() != existingPlayer.getId()) {                    
-                let playerObject = {};
-                playerObject.id = existingPlayer.getId();
-                playerObject.name = existingPlayer.getName();
-                dataObject.victims.push(playerObject);
-            }            
-        }
-        claimant.getClient().emit("choose fool victims", dataObject);
-        let logEntry = claimant.getName() + " is the Fool, choosing their victims.";
-        turn.addLogEntry(logEntry);
-        let otherDataObject = {};
-        otherDataObject.playerName = claimant.getName();
-        otherDataObject.message = "They are the Fool, choosing their victims.";
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != claimant.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
-            }
-        }
+    chooseFoolVictims(pRightfulClaimant) {
+        this.chooseSwapOrNotTarget(pRightfulClaimant.getId(), "You are the Fool. Choose a swap (or not) target.", null) ;
     }
-    foolVictimsChosen(pData) {
-        let turn = this.getLatestTurn();
-        let claimant = this.getPlayerById(pClient.id);
-        let victim1 = this.getPlayerById(pData.id1);
-        let victim2 = this.getPlayerById(pData.id2);
-        // need to swap or not
-        let dataObject = {};
-        dataObject.playerid = claimant.getId();
-        dataObject.victim1Name = victim1.getName();
-        dataObject.victim1Id = victim1.getId();
-        dataObject.victim2Name = victim2.getName();
-        dataObject.victim2Id = victim2.getId();
-        claimant.getClient().emit("fool swap or not result", dataObject);
-        let logEntry = claimant.getName() + ' is the Fool. They are swapping ' + victim1.getName() + ' with ' + victim2.getName() + '; or are they?';
-        turn.addLogEntry(logEntry);
-        let otherDataObject = {};
-        otherDataObject.playerName = claimant.getName();
-        otherDataObject.message = claimant.getName() + ' is the Fool. They are swapping ' + victim1.getName() + ' with ' + victim2.getName() + '; or are they?';
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != claimant.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
-            }
-        }
-    }
-    foolSwapChosen(pData){
-        let turn = this.getLatestTurn();
-        let claimant = this.getPlayerById(pClient.id);
-        let victim1 = this.getPlayerById(pData.victim1);
-        let victim2 = this.getPlayerById(pData.victim2);
-
-        let tempCard = victim1.getCard();
-
-        victim1.setCard(victim2.getCard());
-        victim2.setCard(tempCard);
-
-        // fool swapped victims cards
-        let logEntry = claimant.getName() + " is the Fool and swapped " + victim1.getName() + " and " + victim2.getName() + "; or did they?";
-        turn.addLogEntry(logEntry);
-        this.finishEnactingClaims();
-    }
-    foolNotChosen(pData){
-        let turn = this.getLatestTurn();
-        let claimant = this.getPlayerById(pClient.id);
-        let victim1 = this.getPlayerById(pData.victim1);
-        let victim2 = this.getPlayerById(pData.victim2);
-        // fool didn't swap victims cards
-        let logEntry = claimant.getName() + " is the Fool and swapped " + victim1.getName() + " and " + victim2.getName() + "; or did they?";
-        turn.addLogEntry(logEntry);
-        this.finishEnactingClaims();
-    }
+    
     chooseSpyVictim(pClaimant) {
         let turn = this.getLatestTurn();
         let claimant = pClaimant;

@@ -529,6 +529,7 @@
             let returnData = {}
             returnData.decisionMaker = decisionMaker;
             returnData.choiceType = choiceType;
+            returnData.decisionMessage = decisionMessage;
             returnData.choiceMade = turnOption.id;
             returnData.bonusData = pData.bonusData;            
             let buttonId = turnOption.id + 'Button';
