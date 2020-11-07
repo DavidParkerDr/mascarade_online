@@ -451,6 +451,9 @@ class ServerGame {
         else if(choiceType == "witchVictimChosen") {
             this.witchVictimChosen(pData);
         }
+        else if(choiceType == "spyVictimChosen") {
+            this.spyVictimChosen(pData);
+        }
         else if(choiceType == "areYouReady") {
             this.areYouReady(pData);
         }
@@ -496,7 +499,7 @@ class ServerGame {
     }
     chooseToSwapOrNot(pData) {
         let turn = this.getLatestTurn();
-        let player = turn.getPlayer();
+        let player = turn.getPlayerById(pData.decisionMaker);
         let bonusData = pData.bonusData;
         let chosenPlayer = pData.choiceMade;
         if(bonusData.length == 0) {
@@ -1059,65 +1062,60 @@ class ServerGame {
         this.chooseSwapOrNotTarget(pRightfulClaimant.getId(), "You are the Fool. Choose a swap (or not) target.", null) ;
     }
     
-    chooseSpyVictim(pClaimant) {
+    chooseSpyVictim(pRightfulClaimant) {
         let turn = this.getLatestTurn();
-        let claimant = pClaimant;
+        let claimant = pRightfulClaimant;
         let dataObject = {};
-        dataObject.victims = [];
-        for (let i = 0; i < this.numberOfPlayers(); i++) {
-            let existingPlayer = this.getPlayer(i);
-            if(claimant.getId() != existingPlayer.getId()) {                    
-                let playerObject = {};
-                playerObject.id = existingPlayer.getId();
-                playerObject.name = existingPlayer.getName();
-                dataObject.victims.push(playerObject);
-            }            
-        }
-        claimant.getClient().emit("choose spy victim", dataObject);
-        let logEntry = claimant.getName() + " is the Spy, choosing their victim.";
-        turn.addLogEntry(logEntry);
-        let otherDataObject = {};
-        otherDataObject.playerName = claimant.getName();
-        otherDataObject.message = "They are the Spy, choosing their victim.";
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != claimant.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
+        dataObject.replyMessage = "decisionMade";
+        dataObject.choiceType = "spyVictimChosen";
+        dataObject.turnOptions = [];
+        dataObject.bonusData = [];
+        dataObject.bonusData.push(claimant.getId());
+        dataObject.decisionMaker = claimant.getId();
+        dataObject.decisionMessage = "As the Spy, you can look at another player's card, then choose whether to swap or not with them."
+        for(let i = 0; i < this.numberOfPlayers(); i +=1) {
+            let otherPlayer = this.getPlayer(i);
+            if(otherPlayer.getId() != claimant.getId()) {
+                let turnOption = {id: otherPlayer.getId(), text: otherPlayer.getName()};
+                dataObject.turnOptions.push(turnOption);
             }
         }
+        let logEntry = claimant.getName() + ", the Spy, is choosing their victim from amongst the other players.";
+        turn.addLogEntry(logEntry);
+        this.updateClientPlayers();
+        claimant.getClient().emit("makeADecision", dataObject);
     }
     spyVictimChosen(pData) {
         let turn = this.getLatestTurn();
-        let claimant = this.getPlayerById(pClient.id);
-        let victim = this.getPlayerById(pData.id);
-
-        // need to swap or not
+        let player = this.getPlayerById(pData.decisionMaker);
+        let bonusData = pData.bonusData;
+        let chosenPlayer = pData.choiceMade;
+        
+        let firstTargetId = bonusData[0];
+        let firstTarget = this.getPlayerById(firstTargetId);
+        let secondTargetId = pData.choiceMade;
+        let secondTarget = this.getPlayerById(secondTargetId);
         let dataObject = {};
-        dataObject.playerid = claimant.getId();
-        dataObject.playerCard = claimant.getCard().getName();
-        dataObject.victimId = victim.getId();
-        dataObject.victimName = victim.getName();
-        dataObject.victimCard = victim.getCard().getName();
-        claimant.getClient().emit("spy swap or not result", dataObject);
-        let logEntry = claimant.getName() + ' is the Spy. They are swapping with ' + victim.getName() + '; or are they?';
+        bonusData.push(secondTargetId);
+        dataObject.bonusData = bonusData;
+        dataObject.replyMessage = "decisionMade";
+        dataObject.choiceType = "swapOrNotWithPlayerChosen";        
+        dataObject.turnOptions = [];
+        let choiceObject = {};
+        choiceObject.id = "swap";
+        choiceObject.text = "Swap";
+        dataObject.turnOptions.push(choiceObject);
+        choiceObject = {};
+        choiceObject.id = "not";
+        choiceObject.text = "Not";
+        dataObject.turnOptions.push(choiceObject);
+        dataObject.decisionMessage = 'You are actually the ' + player.getCard().getName() + '. Choose whether to swap or not with ' + secondTarget.getName() + ' who is the ' + secondTarget.getCard().getName() + '.';
+        let logEntry = firstTarget.getName() + " is swapping with " + secondTarget.getName() + "; or are they?";
         turn.addLogEntry(logEntry);
-        let otherDataObject = {};
-        otherDataObject.playerName = claimant.getName();
-        otherDataObject.message = claimant.getName() + ' is the Spy. They are swapping with ' + victim.getName() + '; or are they?';
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != claimant.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
-            }
-        }
-                
-    }
+        this.updateClientPlayers();
+        player.getClient().emit("makeADecision", dataObject);
+    }      
+    
     spySwapChosen(pData){
         let turn = this.getLatestTurn();
         let victim = this.getPlayerById(pData.victimId);
