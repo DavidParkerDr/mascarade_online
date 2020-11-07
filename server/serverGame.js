@@ -1210,14 +1210,18 @@ class ServerGame {
     
     endTurn(pData) {
         let turn = this.getLatestTurn();
-        let winner = this.hasAnyOneWon();
-        if(winner == null) {
+        let winners = this.hasAnyOneWon();
+        if(winners == null) {
             this.incrementCurrentPlayerIndex();
             this.nextTurn();
         }
         else {
-            let logEntry = winner.getName() + " has won with " + winner.getCoins() + " coins.";
-            turn.addLogEntry(logEntry);
+            for(let i = 0; i < winners.length; i+=1) {
+                let winner = winners[i];
+                let logEntry = winner.getName() + " has won with " + winner.getCoins() + " coins.";
+                turn.addLogEntry(logEntry);
+            }
+            
             this.updateClientPlayers();
             this.endGame();
         }
@@ -1229,11 +1233,10 @@ class ServerGame {
         let turn = this.getLatestTurn();
         this.setAllPlayersNotReady();
         this.setShowReady(true);
-        
-        let logEntry = pWinner.getName() + " has won with " + pWinner.getCoins() + " coins.";
-        turn.addLogEntry(logEntry);
-        let dataObject = {};
-        dataObject.claimsResolution = turn.getClaimResolution();
+        if(pWinner != null) {
+            let logEntry = pWinner.getName() + " has won with " + pWinner.getCoins() + " coins.";
+            turn.addLogEntry(logEntry);
+        }
         let total = this.numberOfPlayers();
         for(let i = 0; i < total; i +=1) {
             let player = this.getPlayer(i);
@@ -1246,10 +1249,33 @@ class ServerGame {
 
     hasAnyOneWon() {
         let total = this.numberOfPlayers();
+        let winners = [];
         for(let i = 0; i < total; i +=1) {
             let player = this.getPlayer(i);
-            if (player.getCoins() >= 13) {
-                return player;
+            let coins = player.getCoins();
+            if (coins >= 13) {
+                winners.push(player);
+                return winners;
+            }
+            else if(coins <= 0) {
+                let turn = this.getLatestTurn();
+                let logEntry = player.getName() + " has gone bankrupt.";
+                turn.addLogEntry(logEntry);
+                let biggestFortune = 0;
+                for(let i = 0; i < this.numberOfPlayers(); i+= 1) {
+                    let player = this.getPlayer(i);
+                    if(!player.getIsPlaceHolder()) {
+                        if(player.getCoins() > biggestFortune) {                    
+                            biggestFortune = player.getCoins();
+                            winners = [];
+                            winners.push(player);
+                        }
+                        else if(player.getCoins() == biggestFortune) {       
+                            winners.push(player);
+                        }
+                    }
+                }
+                return winners;
             }
         }
         return null;
