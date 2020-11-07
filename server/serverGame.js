@@ -460,6 +460,13 @@ class ServerGame {
         else if(choiceType == "bishopVictimChosen") {
             this.bishopVictimChosen(pData);
         }
+        else if(choiceType == "inquisitorVictimChosen") {
+            this.inquisitorVictimChosen(pData);
+        }
+        else if(choiceType == "inquisitorVictimGuessed") {
+            this.inquisitorVictimGuessed(pData);
+        }
+        
         
     }
     chooseSwapOrNotTarget(pDecisionMaker, pDecisionMessage, pPreviousTarget = null) {
@@ -1114,96 +1121,71 @@ class ServerGame {
         turn.addLogEntry(logEntry);
         this.updateClientPlayers();
         player.getClient().emit("makeADecision", dataObject);
-    }      
+    }          
     
-    spySwapChosen(pData){
+    chooseInquisitorVictim(pRightfulClaimant) {
         let turn = this.getLatestTurn();
-        let victim = this.getPlayerById(pData.victimId);
-        let claimant = this.getPlayerById(pClient.id);
-
-        let tempCard = claimant.getCard();
-
-        claimant.setCard(victim.getCard());
-        victim.setCard(tempCard);
-
-        // spy swapped victims cards
-        let logEntry = claimant.getName() + " is the Spy and swapped with " + victim.getName() + "; or did they?";
-        turn.addLogEntry(logEntry)
-        this.finishEnactingClaims();
-    }
-    spyNotChosen(pData){
-        let turn = this.getLatestTurn();
-        let victim = this.getPlayerById(pData.victim);
-        let claimant = this.getPlayerById(pClient.id);
-        // spy didn't swap victims cards
-        let logEntry = claimant.getName() + " is the Spy and swapped with " + victim.getName() + "; or did they?";
-        turn.addLogEntry(logEntry)
-        this.finishEnactingClaims();
-    }
-    chooseInquisitorVictim(pData) {
-        let turn = this.getLatestTurn();
-        let claimant = pClaimant;
+        let claimant = pRightfulClaimant;
         let dataObject = {};
-        dataObject.victims = [];
-        for (let i = 0; i < this.numberOfPlayers(); i++) {
-            let existingPlayer = this.getPlayer(i);
-            if(claimant.getId() != existingPlayer.getId()) {                    
-                let playerObject = {};
-                playerObject.id = existingPlayer.getId();
-                playerObject.name = existingPlayer.getName();
-                dataObject.victims.push(playerObject);
-            }            
-        }
-        claimant.getClient().emit("choose inquisitor victim", dataObject);
-        let logEntry = claimant.getName() + " is the Inquisitor, choosing their victim.";
-        turn.addLogEntry(logEntry)
-        let otherDataObject = {};
-        otherDataObject.playerName = claimant.getName();
-        otherDataObject.message = "They are the Inquisitor, choosing their victim.";
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != claimant.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
-                }
+        dataObject.replyMessage = "decisionMade";
+        dataObject.choiceType = "inquisitorVictimChosen";
+        dataObject.turnOptions = [];
+        dataObject.bonusData = [];
+        dataObject.bonusData.push(claimant.getId());
+        dataObject.decisionMaker = claimant.getId();
+        dataObject.decisionMessage = "As the Inquisitor, you can chose another player who must then correctly guess their identity. If they fail, they must pay you 4 coins."
+        for(let i = 0; i < this.numberOfNonPlaceHolderPlayers(); i +=1) {
+            let otherPlayer = this.getPlayer(i);
+            if(otherPlayer.getId() != claimant.getId()) {
+                let turnOption = {id: otherPlayer.getId(), text: otherPlayer.getName()};
+                dataObject.turnOptions.push(turnOption);
             }
         }
+        let logEntry = claimant.getName() + ", the Inquisitor, is choosing their victim from amongst the other players.";
+        turn.addLogEntry(logEntry);
+        this.updateClientPlayers();
+        claimant.getClient().emit("makeADecision", dataObject);
     }
     inquisitorVictimChosen(pData) {
         let turn = this.getLatestTurn();
-        let claimant = this.getPlayerById(pClient.id);
-        let victim = this.getPlayerById(pData.id);
-        // victim has to guess what they are
+        let player = this.getPlayerById(pData.decisionMaker);
+        let victim = this.getPlayerById(pData.choiceMade);
         let dataObject = {};
+        dataObject.replyMessage = "decisionMade";
+        dataObject.choiceType = "inquisitorVictimGuessed";
+        dataObject.turnOptions = [];
+        dataObject.bonusData = [];
+        dataObject.bonusData.push(victim.getId());
+        dataObject.decisionMaker = player.getId();
+
         let deck = Deck.createDeck(this.numberOfNonPlaceHolderPlayers());
         dataObject.claimOptions = [];
+        let peasantCount = 0;
         for (let i = 0; i < deck.numberOfCards(); i++) {
             let card = deck.getCard(i);
-            dataObject.claimOptions.push(card.getName());         
-        }
-        victim.getClient().emit("make a guess", dataObject);
-        let logEntry = victim.getName() + " didn't expect the Inquisitor! Now they have to identify themselves.";
-        turn.addLogEntry(logEntry)
-        let otherDataObject = {};
-        otherDataObject.playerName = victim.getName();
-        otherDataObject.message = "Didn't expect the Inquisitor! Now they have to identify themselves.";
-        let total = this.numberOfPlayers();
-        for(let i = 0; i < total; i +=1) {
-            let player = this.getPlayer(i);
-            if (player.getId() != victim.getId()) {
-                if(!player.getIsPlaceHolder()) {
-                    player.getClient().emit("other turn", otherDataObject);
+            if(card.getName() == "Peasant") {
+                if(peasantCount > 0) {
+                    continue;
                 }
+                peasantCount += 1;
             }
+            let turnOption = {};
+            turnOption.id = card.getName();
+            turnOption.text = card.getName();
+            dataObject.turnOptions.push(turnOption);
         }
-
+        dataObject.decisionMessage = "Who do you think you are?";
+        victim.getClient().emit("makeADecision", dataObject);
+        let logEntry = player.getName() + " is forcing " + victim.getName() + " to guess their identity!";
+        turn.addLogEntry(logEntry);
+        this.updateClientPlayers();
     }
     inquisitorVictimGuessed(pData) {
         let turn = this.getLatestTurn();
         let claimant = turn.getRightfulClaimant(0);
-        let victim = this.getPlayerById(pClient.id);
-        if(victim.getCard().getName() != pData) {
+        let victimId = pData.bonusData[0];
+        let victim = this.getPlayerById(victimId);
+        if(victim.getCard().getName() != pData.choiceMade) {
             // guessed wrong pay the inquisitor
             let tempCoins = victim.getCoins();
             victim.removeCoins(4);
@@ -1213,15 +1195,17 @@ class ServerGame {
             claimant.addCoins(tempCoins);
             let logEntry = claimant.getName() + " is the Inquisitor and has taken " + tempCoins + " coins from " + victim.getName() + " for guessing wrong.";
             turn.addLogEntry(logEntry)
-            this.finishEnactingClaims();
+            
         }
         else {
             // guessed right nothing happens
             let logEntry = claimant.getName() + " is the Inquisitor and " + victim.getName() + " correctly guessed that they were the " + victim.getCard().getName() + ".";
             turn.addLogEntry(logEntry)
             
-            this.finishEnactingClaims();
+            
         }
+        this.updateClientPlayers();
+        this.finishEnactingClaims();
     }
     
     endTurn(pData) {
@@ -1370,40 +1354,7 @@ class ServerGame {
         // Broadcast removed player to connected socket clients
         pClient.broadcast.emit("remove player", {id: pClient.id});
     };
-    /* onNewPlayer(pClient, pData) {
-        // Create a new player
-        if(false) {
-            pClient.emit("game already started", {});
-            return;
-        }
-        //generate a new player id and colour
-        var newPlayer = new ServerPlayer(pClient.id, Utils.randomColour(), "No Name", false, false, pClient);
-        
-        // Broadcast new player to connected socket clients
-        pClient.broadcast.emit("new player", {id: newPlayer.getId(), colour: newPlayer.getColour(), name: newPlayer.getName(), isLocal: false});
-        console.log("sending new player to existing players: " + newPlayer.getId());
-        
-        
-        // Send the new player all of the other players details
-        var i, existingPlayer;
-        for (i = 0; i < this.numberOfPlayers(); i++) {
-            existingPlayer = this.getPlayer(i);
-            let card = existingPlayer.getCard();
-            let cardName = "";
-            if(card != null) {
-                cardName = card.getName();
-            }
-            pClient.emit("new player", {id: existingPlayer.getId(), colour: existingPlayer.getColour(), name: existingPlayer.getName(), card: cardName, isLocal: false, isPlaceHolder: existingPlayer.getIsPlaceHolder()});
-            console.log("(" + i + ")" + "sending existing player list to new player: " + existingPlayer.getId());
-        };
-        // send the new player its new id, colour, and tile
-        pClient.emit("new player id", {id: newPlayer.getId(), colour: newPlayer.getColour(), name: newPlayer.getName(), isLocal: true});
-        console.log("sending new id new player: " + newPlayer.getId());
-        // add new player to list of players
-        this.addPlayer(newPlayer);
-        
-            
-    }; */
+   
     onNewPlayer(pClient, pData) {
         // Create a new player
         if(this.getIsGameStarted()) {
