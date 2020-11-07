@@ -49,7 +49,7 @@ class Deck {
 
     static createDeck(pNumberOfPlayers) {
         switch(pNumberOfPlayers) {
-            case 2: return Deck.createThirteenPlayerDeck(); break;
+            case 2: return Deck.createTestDeck(); break;
             case 4: return Deck.createFourPlayerDeck(); break;
             case 5: return Deck.createFivePlayerDeck(); break;
             case 6: return Deck.createSixPlayerDeck(); break;
@@ -128,7 +128,16 @@ class Deck {
         this.addCard(widow);
     }
     
-
+    static createTestDeck() {
+        let deck = new Deck();
+        deck.useFool();
+        deck.useCheat();
+        deck.useSpy();
+        deck.useInquisitor();
+        deck.useWidow();
+        deck.useKing();
+        return deck;
+    }
     static createFourPlayerDeck() {
         let deck = new Deck();
         deck.useJudge();
