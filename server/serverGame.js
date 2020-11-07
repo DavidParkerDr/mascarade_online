@@ -467,19 +467,19 @@ class ServerGame {
         dataObject.decisionMaker = pDecisionMaker;
         dataObject.choiceType = "swapOrNotPlayerChoice";        
         dataObject.bonusData = [];
-        if(pPreviousTarget != null) {
-            dataObject.bonusData.push(pPreviousTarget);
-        }
         dataObject.turnOptions = [];
         for (let i = 0; i < this.numberOfPlayers(); i++) {
             let otherPlayer = this.getPlayer(i);
-            if(player.getId() != otherPlayer.getId()) {                    
+            if(player.getId() != otherPlayer.getId() && (pPreviousTarget == null || pPreviousTarget != otherPlayer.getId())) {                    
                 let choiceObject = {};
                 choiceObject.id = otherPlayer.getId();
                 choiceObject.text = otherPlayer.getName();
                 dataObject.turnOptions.push(choiceObject);
             }            
         }
+        if(pPreviousTarget != null) {
+            dataObject.bonusData.push(pPreviousTarget);
+        }        
         dataObject.decisionMessage = pDecisionMessage;
         let logEntry = player.getName() + " is choosing";
         if(pPreviousTarget == null) {
