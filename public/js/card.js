@@ -1,7 +1,7 @@
 class Card {
-    constructor(pName) {
+    constructor(pName, pDescription) {
         this.setName(pName);
-        this.show();
+        this.setDescription(pDescription);
     }
     setName(pName) {
         this.mName = pName;
@@ -9,14 +9,11 @@ class Card {
     getName() {
         return this.mName;
     }
-    hide() {
-        this.mHidden = true;
+    setDescription(pDescription) {
+        this.mDescription = pDescription;
     }
-    show() {
-        this.mHidden = false;
-    }
-    isHidden() {
-        return this.mHidden;
+    getDescription() {
+        return this.mDescription;
     }
 }
 if (typeof exports !== 'undefined') {
