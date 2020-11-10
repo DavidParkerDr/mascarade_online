@@ -327,7 +327,7 @@ class ServerGame {
             dealingTurn.addLogEntry(logEntry);            
         }
         this.setReadyReplyMessage("player ready");
-        this.setMandatorySwaps(0);
+        this.setMandatorySwaps(4);
         this.setIsGameStarted(true);
         this.setCourthouseCoins(0);
         this.setAllPlayersNotReady();
