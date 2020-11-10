@@ -673,9 +673,10 @@ class ServerGame {
         }
     }
     checkMandatorySwaps() {
+        let turn = this.getLatestTurn();
         let mandatorySwapsNeeded = false;
-        if(this.numberOfClaimingPlayers() > 1) {
-            for(let i = 0; i < this.numberOfClaimingPlayers(); i+=1) {
+        if(turn.numberOfClaimingPlayers() > 1) {
+            for(let i = 0; i < turn.numberOfClaimingPlayers(); i+=1) {
                 let claimant = turn.getClaimingPlayer(i);
                 let claimantIndex = this.getPlayerIndex(claimant.getId());
                 let nextPlayerIndex = this.getNextPlayerIndex();
@@ -891,7 +892,7 @@ class ServerGame {
     }
     finishEnactingClaims(pWinner = null) {
         let turn = this.getLatestTurn();
-        
+        this.checkMandatorySwaps();
         console.log("finishing enacting claims");
         if(turn.getFines() > 0) {
             this.addCourthouseCoins(turn.getFines());
