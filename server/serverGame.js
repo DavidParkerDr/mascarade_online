@@ -441,7 +441,9 @@ class ServerGame {
             this.swapOrNotWithPlayerChosen(pData);
         }   
         else if(choiceType == "lookedAtCard") {
-            this.endTurn();
+            this.setAllPlayersNotReady();
+            this.sendAreYouReadyToAll("nextTurn");
+            this.updateClientPlayers();
         }   
         else if(choiceType == "madeAClaim") {
             this.madeAClaim(pData);
@@ -555,7 +557,9 @@ class ServerGame {
             firstTarget.setCard(secondTarget.getCard());
             secondTarget.setCard(tempCard);
         }
-        this.endTurn();
+        this.setAllPlayersNotReady();
+        this.sendAreYouReadyToAll("nextTurn");
+        this.updateClientPlayers();
     }
     madeACounterClaim(pData) {
         let turn = this.getLatestTurn();
@@ -986,10 +990,10 @@ class ServerGame {
         dataObject.bonusData = [];
         dataObject.decisionMaker = player.getId();
        
-        let swapTurnOption = {};
-        swapTurnOption.id = "endTurn";
-        swapTurnOption.text = "End Turn";
-        dataObject.turnOptions.push(swapTurnOption);
+        let lookTurnOption = {};
+        lookTurnOption.id = "endTurn";
+        lookTurnOption.text = "End Turn";
+        dataObject.turnOptions.push(lookTurnOption);
         dataObject.decisionMessage = "You are looking at your card. You are the " + player.getCard().getName() + ".";
         player.getClient().emit("makeADecision", dataObject);
         let logEntry = player.getName() + " is looking at their card.";
@@ -1217,11 +1221,8 @@ class ServerGame {
         let turn = this.getLatestTurn();
         let winners = this.hasAnyOneWon();
         if(winners == null) {
-            this.incrementCurrentPlayerIndex();
-            this.setAllPlayersNotReady();
-            this.sendAreYouReadyToAll("nextTurn");
-            this.updateClientPlayers();
-            //this.nextTurn();
+            this.incrementCurrentPlayerIndex();            
+            this.nextTurn();
         }
         else {
             for(let i = 0; i < winners.length; i+=1) {
