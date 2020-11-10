@@ -374,6 +374,7 @@ class ServerGame {
         pPlayer.getClient().emit("makeADecision", dataObject);    
     }
     sendAreYouReadyToAll(pWhereNext) {
+        this.setShowReady(true);
         for(let i = 0; i < this.numberOfNonPlaceHolderPlayers(); i +=1) {
             let player = this.getPlayer(i);
             this.sendAreYouReady(player, pWhereNext, true);
@@ -642,6 +643,7 @@ class ServerGame {
                 console.log("the claim was uncontested");
                 turn.addRightfulClaimant(turn.getClaimingPlayer(0));
                 let logEntry = turn.getClaimingPlayer(0).getName() + "'s claim to be the " + turn.getClaim() + " was uncontested.";
+                turn.setUncontested(true);
                 turn.addLogEntry(logEntry);
                 this.updateClientPlayers();
             }                 
@@ -658,9 +660,11 @@ class ServerGame {
             }
             else {
                 if(turn.numberofRightfulClaimants() == 1) {
-                    let logEntry = turn.getRightfulClaimant(0).getName() + "'s claim to be the " + turn.getClaim() + " is righteous.";
-                    turn.addLogEntry(logEntry);
-                    this.updateClientPlayers();
+                    if(!turn.getUncontested()) {
+                        let logEntry = turn.getRightfulClaimant(0).getName() + "'s claim to be the " + turn.getClaim() + " is righteous.";
+                        turn.addLogEntry(logEntry);
+                        this.updateClientPlayers();
+                    }
                 }
                 else if(turn.numberofRightfulClaimants() == 2) {
                     let logEntry = turn.getRightfulClaimant(0).getName() + " and " + turn.getClaimingPlayer(1).getName() + " are both " + turn.getClaim() + "s.";
@@ -1062,7 +1066,7 @@ class ServerGame {
         claimant.setCoins(victim.getCoins());
         victim.setCoins(tempCoins);  
      
-        let logEntry = claimant.getName() + " is the Witch and took " + claimant.getCoins() +  " coins from " + victim.getName() + " leaving them with a paltry " + victim.getCoins() + ".";
+        let logEntry = claimant.getName() + " is the Witch and swapped fortunes with " + victim.getName() +  "; taking " + claimant.getCoins() + " and leaving them with a paltry " + victim.getCoins() + ".";
         turn.addLogEntry(logEntry);
         this.updateClientPlayers();
         this.finishEnactingClaims();     

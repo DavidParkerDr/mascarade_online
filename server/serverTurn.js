@@ -3,6 +3,12 @@ class ServerTurn {
         this.setPlayer(pPlayer);
         this.initialiseTurn();
     }
+    setUncontested(pContested) {
+        this.mContested = pContested;
+    }
+    getContested() {
+        return this.mContested;
+    }
     setPlayer(pPlayer) {
         this.mPlayer = pPlayer;
     }
@@ -24,6 +30,7 @@ class ServerTurn {
         this.setClaimResolution(null);
         this.setFines(0);
         this.setClaim(null);
+        this.setUncontested(false);
                 
     }
     fineFalseClaims() {
