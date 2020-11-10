@@ -696,8 +696,9 @@ class ServerGame {
             // take the coins from the courthouse
             let rightfulClaimant = turn.getRightfulClaimant(0);
             rightfulClaimant.addCoins(this.getCourthouseCoins());
-            this.setCourthouseCoins(0);                  
             let logEntry = rightfulClaimant.getName() + " is the Judge and took " + this.getCourthouseCoins() +  " coins from the Courthouse.";
+            this.setCourthouseCoins(0);             
+            
             turn.addLogEntry(logEntry);
             this.updateClientPlayers();
                
@@ -1015,7 +1016,7 @@ class ServerGame {
     }
     bishopVictimChosen(pData) {
         let turn = this.getLatestTurn();
-        let claimant = this.getPlayerById(pData.pDecisionMaker);
+        let claimant = this.getPlayerById(pData.decisionMaker);
         let victim = this.getPlayerById(pData.choiceMade);
         
         let tempCoins = victim.getCoins();
