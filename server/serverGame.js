@@ -374,7 +374,7 @@ class ServerGame {
         pPlayer.getClient().emit("makeADecision", dataObject);    
     }
     sendAreYouReadyToAll(pWhereNext) {
-        this.setShowReady(true);
+        this.setShowReady(true);        
         for(let i = 0; i < this.numberOfNonPlaceHolderPlayers(); i +=1) {
             let player = this.getPlayer(i);
             this.sendAreYouReady(player, pWhereNext, true);
@@ -1218,8 +1218,10 @@ class ServerGame {
         let winners = this.hasAnyOneWon();
         if(winners == null) {
             this.incrementCurrentPlayerIndex();
+            this.setAllPlayersNotReady();
             this.sendAreYouReadyToAll("nextTurn");
-            this.nextTurn();
+            this.updateClientPlayers();
+            //this.nextTurn();
         }
         else {
             for(let i = 0; i < winners.length; i+=1) {
