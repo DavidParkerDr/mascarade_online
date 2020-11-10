@@ -991,7 +991,6 @@ class ServerGame {
         swapTurnOption.text = "End Turn";
         dataObject.turnOptions.push(swapTurnOption);
         dataObject.decisionMessage = "You are looking at your card. You are the " + player.getCard().getName() + ".";
-        this.decrementMandatorySwaps();     
         player.getClient().emit("makeADecision", dataObject);
         let logEntry = player.getName() + " is looking at their card.";
         turn.addLogEntry(logEntry);
@@ -1219,6 +1218,7 @@ class ServerGame {
         let winners = this.hasAnyOneWon();
         if(winners == null) {
             this.incrementCurrentPlayerIndex();
+            this.sendAreYouReadyToAll("nextTurn");
             this.nextTurn();
         }
         else {
