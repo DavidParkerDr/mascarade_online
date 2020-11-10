@@ -506,7 +506,7 @@ class ServerGame {
     }
     chooseToSwapOrNot(pData) {
         let turn = this.getLatestTurn();
-        let player = turn.getPlayerById(pData.decisionMaker);
+        let player = this.getPlayerById(pData.decisionMaker);
         let bonusData = pData.bonusData;
         let chosenPlayer = pData.choiceMade;
         if(bonusData.length == 0) {
