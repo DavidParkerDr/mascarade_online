@@ -6,7 +6,7 @@ class ServerTurn {
     setUncontested(pContested) {
         this.mContested = pContested;
     }
-    getContested() {
+    getUncontested() {
         return this.mContested;
     }
     setPlayer(pPlayer) {
